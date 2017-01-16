@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -28,8 +29,6 @@ type translateResponse struct {
 var cache *Cache
 
 func main() {
-	log.Printf("Starting!")
-
 	m := http.NewServeMux()
 
 	m.HandleFunc("/api/translate", translateHandler)
@@ -40,12 +39,19 @@ func main() {
 
 	cache = NewCache()
 
-	err := graceful.RunWithErr("localhost:7001", 60*time.Second, n)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
+	}
+
+	listenAddr := fmt.Sprintf("127.0.0.1:%s", port)
+
+	log.Println("Starting listening on", listenAddr)
+
+	err := graceful.RunWithErr(listenAddr, 60*time.Second, n)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	log.Printf("Exiting!")
 }
 
 func translateHandler(w http.ResponseWriter, r *http.Request) {
