@@ -57,34 +57,45 @@ func main() {
 func translateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	if r.Method != "POST" {
-		err := fmt.Errorf("Only accepting JSON POST ")
-		if err := json.NewEncoder(w).Encode(err); err != nil {
-			panic(err)
-		}
-		return
-	}
-
 	var req translateRequest
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
-	if err != nil {
-		panic(err)
-	}
-	if err := r.Body.Close(); err != nil {
-		panic(err)
-	}
 
-	if err := json.Unmarshal(body, &req); err != nil {
-		log.Println(string(body))
-		log.Println(req)
-
-		w.WriteHeader(http.StatusUnprocessableEntity)
-
-		if err := json.NewEncoder(w).Encode(err); err != nil {
+	switch r.Method {
+	case "POST":
+		body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
+		if err != nil {
+			panic(err)
+		}
+		if err := r.Body.Close(); err != nil {
 			panic(err)
 		}
 
-		return
+		if err := json.Unmarshal(body, &req); err != nil {
+			log.Println(string(body))
+			log.Println(req)
+
+			w.WriteHeader(http.StatusUnprocessableEntity)
+
+			if err := json.NewEncoder(w).Encode(err); err != nil {
+				panic(err)
+			}
+
+			return
+		}
+	case "GET":
+		if err := r.ParseForm(); err != nil {
+			panic(err)
+		}
+
+		req.Text = r.Form.Get("text")
+		req.From = r.Form.Get("from")
+		req.To = r.Form.Get("to")
+
+		fmt.Println(req.Text)
+	default:
+		err := fmt.Errorf("Bad request method")
+		if err := json.NewEncoder(w).Encode(err); err != nil {
+			panic(err)
+		}
 	}
 
 	if len(req.Text) < 1 || len(req.From) < 1 || len(req.To) < 1 {

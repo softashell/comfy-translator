@@ -7,12 +7,11 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"strings"
 	"time"
 )
 
 const (
-	delay      = 1500 * time.Millisecond
+	delay      = time.Second
 	requestURL = "https://translate.google.com/"
 )
 
@@ -67,18 +66,30 @@ func googleTranslate(text string, from string, to string) (string, error) {
 	contents, err := ioutil.ReadAll(resp.Body)
 	check(err)
 
-	reg, err := regexp.Compile("\"(.+?)\"")
+	//fmt.Println(string(contents))
+
+	reg, err := regexp.Compile("\"(.+?)\",\"(.+?)\",?")
 	check(err)
 
-	var allStrings []string
-	allStrings = reg.FindAllString(string(contents), 2)
+	var allStrings [][]string
+	allStrings = reg.FindAllStringSubmatch(string(contents), -1)
 
 	if len(allStrings) < 1 {
 		return "", fmt.Errorf("Bad response %s", contents)
 	}
 
-	s := allStrings[0]
-	s = strings.Trim(s, "\"")
+	var out string
+	for _, v := range allStrings {
+		if len(v) < 3 {
+			continue
+		}
 
-	return s, nil
+		out += v[1]
+	}
+
+	if len(out) < 1 {
+		return out, fmt.Errorf("Bad response %s", contents)
+	}
+
+	return out, nil
 }
