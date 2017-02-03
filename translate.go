@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -88,8 +89,11 @@ func googleTranslate(text string, from string, to string) (string, error) {
 	}
 
 	if len(out) < 1 {
-		return out, fmt.Errorf("Bad response %s", contents)
+		return "", fmt.Errorf("Bad response %s", contents)
 	}
+
+	// Replace escaped quotes
+	out = strings.Replace(out, "\\\"", "\"", -1)
 
 	return out, nil
 }
