@@ -131,6 +131,8 @@ func translateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func translate(req translateRequest) string {
+	log.Println("Input:", req.Text)
+
 	found, output := cache.Get(req.Text)
 
 	var err error
@@ -138,9 +140,9 @@ func translate(req translateRequest) string {
 	if !found {
 		output, err = googleTranslate(req.Text, req.From, req.To)
 		check(err)
-		log.Println("gtranslate =>", output)
+		log.Println("GT:", output)
 
-		// TODO: Fallbak translation if google returns nothing or fails
+		// TODO: Fallback translation if google returns nothing or fails
 
 		cache.Put(req.Text, output)
 	}
