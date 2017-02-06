@@ -91,7 +91,7 @@ func translateWithGoogle(req *translateRequest) (string, error) {
 	// Delete garbage output which often leaves the output empty, fix your shit google tbh
 	out2 := regexp.MustCompile(`\s?_{2,3}(\s\d)?`).ReplaceAllString(out, "")
 	if len(out) < 1 || (len(out2) < len(out)/2) {
-		return "", fmt.Errorf("Bad response %q", contents)
+		return "", fmt.Errorf("Bad response %q", out)
 	}
 
 	out = out2
