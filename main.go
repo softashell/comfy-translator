@@ -3,11 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"github.com/urfave/negroni"
 	"gopkg.in/tylerb/graceful.v1"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -29,6 +29,8 @@ type translateResponse struct {
 var cache *Cache
 
 func main() {
+	log.SetLevel(log.DebugLevel)
+
 	m := http.NewServeMux()
 
 	m.HandleFunc("/api/translate", translateHandler)
@@ -46,7 +48,9 @@ func main() {
 
 	listenAddr := fmt.Sprintf("127.0.0.1:%s", port)
 
-	log.Println("Starting listening on", listenAddr)
+	log.WithFields(log.Fields{
+		"addr": listenAddr,
+	}).Info("Starting comfy translator")
 
 	err := graceful.RunWithErr(listenAddr, 60*time.Second, n)
 	if err != nil {
@@ -70,8 +74,7 @@ func translateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := json.Unmarshal(body, &req); err != nil {
-			log.Println(string(body))
-			log.Println(req)
+			log.Printf("%+v %s", req, string(body))
 
 			w.WriteHeader(http.StatusUnprocessableEntity)
 
@@ -133,19 +136,29 @@ func translateHandler(w http.ResponseWriter, r *http.Request) {
 func translate(req translateRequest) string {
 	log.Println("Input:", req.Text)
 
-	found, output := cache.Get(req.Text)
+	found, out := cache.Get(req.Text)
 
 	var err error
 
 	if !found {
-		output, err = googleTranslate(req.Text, req.From, req.To)
-		check(err)
-		log.Println("GT:", output)
+		out, err = translateWithGoogle(&req)
+		if err != nil {
+			log.Warning("Google:", err)
+			out, err = translateWithTransltr(&req)
+		}
 
-		// TODO: Fallback translation if google returns nothing or fails
+		if err != nil {
+			log.Warning("Transltr:", err)
 
-		cache.Put(req.Text, output)
+			// Not going to cache this since it's probably garbage as well
+			out, err = translateWithHonyaku(&req)
+			if err != nil {
+				log.Warning("Honyaku:", err)
+			}
+		} else {
+			cache.Put(req.Text, out)
+		}
 	}
 
-	return output
+	return out
 }
