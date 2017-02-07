@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	client              = &http.Client{}
+	client              = &http.Client{Timeout: (2 * time.Second)}
 	lastGoogleRequest   = time.Now()
 	lastTransltrRequest = time.Now()
 	lastHonyakuRequest  = time.Now()
@@ -55,14 +55,20 @@ func translateWithGoogle(req *translateRequest) (string, error) {
 	URL.RawQuery = parameters.Encode()
 
 	r, err := http.NewRequest("GET", URL.String(), nil)
-	check(err)
+	if err != nil {
+		log.Errorln("Failed to create request", err)
+		return "", err
+	}
 
 	r.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko")
 
 	lastGoogleRequest = time.Now()
 
 	resp, err := client.Do(r)
-	check(err)
+	if err != nil {
+		log.Errorln("Failed to do request", err)
+		return "", err
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -172,14 +178,20 @@ func translateWithHonyaku(req *translateRequest) (string, error) {
 	URL.RawQuery = parameters.Encode()
 
 	r, err := http.NewRequest("GET", URL.String(), nil)
-	check(err)
+	if err != nil {
+		log.Errorln("Failed to create request", err)
+		return "", err
+	}
 
 	r.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko")
 
 	lastHonyakuRequest = time.Now()
 
 	resp, err := client.Do(r)
-	check(err)
+	if err != nil {
+		log.Errorln("Failed to do request", err)
+		return "", err
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
