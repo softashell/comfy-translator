@@ -106,7 +106,6 @@ func translateHandler(w http.ResponseWriter, r *http.Request) {
 		err := fmt.Errorf("Empty arguments")
 		if err := json.NewEncoder(w).Encode(err); err != nil {
 			panic(err)
-
 		}
 		return
 	}

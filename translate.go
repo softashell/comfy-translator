@@ -105,6 +105,9 @@ func translateWithGoogle(req *translateRequest) (string, error) {
 	// Replace escaped quotes
 	out = strings.Replace(out, "\\\"", "\"", -1)
 
+	// Replace escaped newlines
+	out = strings.Replace(out, "\\n", "\n", -1)
+
 	log.WithFields(log.Fields{
 		"time": time.Since(start),
 	}).Debugf("Google: %q", out)
@@ -136,19 +139,16 @@ func translateWithTransltr(req *translateRequest) (string, error) {
 	}
 
 	var response translateResponse
-
 	if err := json.Unmarshal(reply, &response); err != nil {
 		log.Error("Failed to unmarshal JSON API response", err.Error())
 		return "", err
 	}
 
-	var out string
-	out = response.TranslationText
+	out := response.TranslationText
 
-	// Seems to use google translate as backend as well so it will output the same garbage
+	// Seems to use google translate as backend as well so it will mostly output the same garbage
 	out2 := regexp.MustCompile(`\s?_{2,3}(\s\d)?`).ReplaceAllString(out, "")
 	if len(out) < 1 || (len(out2) < len(out)/2) {
-		// Output it anway since this is the last translation for now
 		return "", fmt.Errorf("Garbage translation %q", out)
 	}
 
