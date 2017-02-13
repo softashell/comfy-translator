@@ -154,7 +154,7 @@ func translate(req translateRequest) string {
 			if err != nil {
 				log.Warning("Honyaku:", err)
 			}
-		} else {
+		} else if len(out) > 0 {
 			cache.Put(req.Text, out)
 		}
 	}

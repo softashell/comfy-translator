@@ -1,11 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	log "github.com/Sirupsen/logrus"
-	"github.com/parnurzeal/gorequest"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -16,11 +16,12 @@ import (
 )
 
 const (
-	delay = time.Second
+	delay = time.Second / 2
 )
 
 var (
-	client              = &http.Client{Timeout: (2 * time.Second)}
+	client = &http.Client{Timeout: (4 * time.Second)}
+
 	lastGoogleRequest   = time.Now()
 	lastTransltrRequest = time.Now()
 	lastHonyakuRequest  = time.Now()
@@ -79,12 +80,15 @@ func translateWithGoogle(req *translateRequest) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("%+v", resp)
+		return "", fmt.Errorf("%s", resp.Status)
 	}
 
 	// [[["It will be saved","助かるわい",,,3]],,"ja"]
 	contents, err := ioutil.ReadAll(resp.Body)
-	check(err)
+	if err != nil {
+		log.Error("Failed to read response body", err)
+		return "", err
+	}
 
 	allStrings := regexp.MustCompile("\"(.+?)\",\"(.+?)\",?").FindAllStringSubmatch(string(contents), -1)
 
@@ -131,25 +135,41 @@ func translateWithTransltr(req *translateRequest) (string, error) {
 	// Convert json object to string
 	jsonString, err := json.Marshal(req)
 	if err != nil {
-		log.Error("Failed to marshal JSON API request", err.Error())
+		log.Errorln("Failed to marshal JSON API request", err)
+		return "", err
 	}
+
+	r, err := http.NewRequest("POST", "http://transltr.org/api/translate", bytes.NewBuffer(jsonString))
+	if err != nil {
+		log.Errorln("Failed to create request", err)
+		return "", err
+	}
+
+	r.Header.Set("Content-Type", "application/json")
 
 	lastTransltrRequest = time.Now()
 	transltrMutex.Unlock()
 
-	// Post the request
-	resp, reply, errs := gorequest.New().Post("http://transltr.org/api/translate").Send(string(jsonString)).EndBytes()
-	for _, err := range errs {
-		log.WithFields(log.Fields{
-			"response": resp,
-			"reply":    reply,
-		}).Error(err.Error())
+	resp, err := client.Do(r)
+	if err != nil {
+		log.Errorln("Failed to do request", err)
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("%s", resp.Status)
+	}
+
+	contents, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Errorln("Failed to read response body", err)
 		return "", err
 	}
 
 	var response translateResponse
-	if err := json.Unmarshal(reply, &response); err != nil {
-		log.Error("Failed to unmarshal JSON API response", err.Error())
+	if err := json.Unmarshal(contents, &response); err != nil {
+		log.Errorln("Failed to unmarshal JSON API response", err)
 		return "", err
 	}
 
@@ -206,9 +226,7 @@ func translateWithHonyaku(req *translateRequest) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		contents, err := ioutil.ReadAll(resp.Body)
-		check(err)
-		return "", fmt.Errorf("%d %s", resp.StatusCode, contents)
+		return "", fmt.Errorf("%s", resp.Status)
 	}
 
 	doc, err := goquery.NewDocumentFromResponse(resp)
