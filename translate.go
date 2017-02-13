@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,6 +24,10 @@ var (
 	lastGoogleRequest   = time.Now()
 	lastTransltrRequest = time.Now()
 	lastHonyakuRequest  = time.Now()
+
+	googleMutex   = &sync.Mutex{}
+	transltrMutex = &sync.Mutex{}
+	honyakuMutex  = &sync.Mutex{}
 )
 
 func checkThrottle(lastReq time.Time) {
@@ -37,6 +42,7 @@ func checkThrottle(lastReq time.Time) {
 func translateWithGoogle(req *translateRequest) (string, error) {
 	start := time.Now()
 
+	googleMutex.Lock()
 	checkThrottle(lastGoogleRequest)
 
 	var URL *url.URL
@@ -63,6 +69,7 @@ func translateWithGoogle(req *translateRequest) (string, error) {
 	r.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko")
 
 	lastGoogleRequest = time.Now()
+	googleMutex.Unlock()
 
 	resp, err := client.Do(r)
 	if err != nil {
@@ -118,6 +125,7 @@ func translateWithGoogle(req *translateRequest) (string, error) {
 func translateWithTransltr(req *translateRequest) (string, error) {
 	start := time.Now()
 
+	transltrMutex.Lock()
 	checkThrottle(lastTransltrRequest)
 
 	// Convert json object to string
@@ -127,6 +135,7 @@ func translateWithTransltr(req *translateRequest) (string, error) {
 	}
 
 	lastTransltrRequest = time.Now()
+	transltrMutex.Unlock()
 
 	// Post the request
 	resp, reply, errs := gorequest.New().Post("http://transltr.org/api/translate").Send(string(jsonString)).EndBytes()
@@ -164,6 +173,7 @@ func translateWithTransltr(req *translateRequest) (string, error) {
 func translateWithHonyaku(req *translateRequest) (string, error) {
 	start := time.Now()
 
+	honyakuMutex.Lock()
 	checkThrottle(lastHonyakuRequest)
 
 	var URL *url.URL
@@ -186,6 +196,7 @@ func translateWithHonyaku(req *translateRequest) (string, error) {
 	r.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko")
 
 	lastHonyakuRequest = time.Now()
+	honyakuMutex.Unlock()
 
 	resp, err := client.Do(r)
 	if err != nil {
