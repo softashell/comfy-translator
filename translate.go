@@ -45,6 +45,7 @@ func translateWithGoogle(req *translateRequest) (string, error) {
 
 	googleMutex.Lock()
 	checkThrottle(lastGoogleRequest)
+	defer googleMutex.Unlock()
 
 	var URL *url.URL
 	URL, err := url.Parse("https://translate.google.com/translate_a/single")
@@ -70,7 +71,6 @@ func translateWithGoogle(req *translateRequest) (string, error) {
 	r.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko")
 
 	lastGoogleRequest = time.Now()
-	googleMutex.Unlock()
 
 	resp, err := client.Do(r)
 	if err != nil {
@@ -131,6 +131,7 @@ func translateWithTransltr(req *translateRequest) (string, error) {
 
 	transltrMutex.Lock()
 	checkThrottle(lastTransltrRequest)
+	defer transltrMutex.Unlock()
 
 	// Convert json object to string
 	jsonString, err := json.Marshal(req)
@@ -148,7 +149,6 @@ func translateWithTransltr(req *translateRequest) (string, error) {
 	r.Header.Set("Content-Type", "application/json")
 
 	lastTransltrRequest = time.Now()
-	transltrMutex.Unlock()
 
 	resp, err := client.Do(r)
 	if err != nil {
@@ -195,6 +195,7 @@ func translateWithHonyaku(req *translateRequest) (string, error) {
 
 	honyakuMutex.Lock()
 	checkThrottle(lastHonyakuRequest)
+	defer honyakuMutex.Unlock()
 
 	var URL *url.URL
 	URL, err := url.Parse("http://honyaku.yahoo.co.jp/transtext")
@@ -216,7 +217,6 @@ func translateWithHonyaku(req *translateRequest) (string, error) {
 	r.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko")
 
 	lastHonyakuRequest = time.Now()
-	honyakuMutex.Unlock()
 
 	resp, err := client.Do(r)
 	if err != nil {
