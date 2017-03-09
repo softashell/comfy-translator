@@ -1,8 +1,8 @@
 package main
 
 import (
+	log "github.com/Sirupsen/logrus"
 	"github.com/boltdb/bolt"
-	"log"
 )
 
 var (
@@ -72,7 +72,7 @@ func (c *Cache) Get(text string) (bool, string) {
 			found = true
 			translation = string(val)
 
-			log.Println("Cache hit!", translation)
+			log.Debugln("Cache hit!", translation)
 		}
 
 		return nil

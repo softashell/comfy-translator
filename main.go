@@ -3,14 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/urfave/negroni"
-	"gopkg.in/tylerb/graceful.v1"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/urfave/negroni"
+	"gopkg.in/tylerb/graceful.v1"
 )
 
 type translateRequest struct {
@@ -133,7 +135,11 @@ func translateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func translate(req translateRequest) string {
-	log.Println("Input:", req.Text)
+	if len(strings.TrimSpace(req.Text)) < 1 {
+		return req.Text
+	}
+
+	log.Printf("Input: %q", req.Text)
 
 	found, out := cache.Get(req.Text)
 

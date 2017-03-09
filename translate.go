@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
-	log "github.com/Sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -13,6 +11,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	log "github.com/Sirupsen/logrus"
 )
 
 const (
@@ -112,6 +113,8 @@ func translateWithGoogle(req *translateRequest) (string, error) {
 	}
 
 	out = out2
+
+	out = strings.Replace(out, "\\\\", "\\", -1)
 
 	// Replace escaped quotes
 	out = strings.Replace(out, "\\\"", "\"", -1)
