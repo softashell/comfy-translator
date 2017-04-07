@@ -38,7 +38,7 @@ func main() {
 	m.HandleFunc("/api/translate", translateHandler)
 
 	n := negroni.New()
-	n.Use(negroni.NewLogger())
+	//n.Use(negroni.NewLogger())
 	n.UseHandler(m)
 
 	cache = NewCache()
@@ -76,7 +76,7 @@ func translateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := json.Unmarshal(body, &req); err != nil {
-			log.Printf("%+v %s", req, string(body))
+			log.Errorf("%+v %s", req, string(body))
 
 			w.WriteHeader(http.StatusUnprocessableEntity)
 
@@ -148,20 +148,25 @@ func translate(req translateRequest) string {
 	if !found {
 		out, err = translateWithGoogle(&req)
 		if err != nil {
-			log.Warning("Google:", err)
+			log.Warning("Google: ", err)
 			out, err = translateWithTransltr(&req)
 		}
 
 		if err != nil {
-			log.Warning("Transltr:", err)
+			log.Warning("Transltr: ", err)
 
 			// Not going to cache this since it's probably garbage as well
 			out, err = translateWithHonyaku(&req)
 			if err != nil {
-				log.Warning("Honyaku:", err)
+				log.Warning("Honyaku: ", err)
 			}
 		} else if len(out) > 0 {
-			cache.Put(req.Text, out)
+			err = cache.Put(req.Text, out)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"err": err,
+				}).Error("Failed to save result to cache")
+			}
 		}
 	}
 

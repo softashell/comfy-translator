@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/boltdb/bolt"
 )
@@ -42,21 +44,18 @@ func (c *Cache) Put(text string, translation string) error {
 		}
 
 		err = bucket.Put([]byte(text), []byte(translation))
-		if err != nil {
-			return err
-		}
 
-		return nil
+		return err
 	})
-	check(err)
 
-	return nil
+	return err
 }
 
 func (c *Cache) Get(text string) (bool, string) {
-
 	var translation string
 	var found bool
+
+	start := time.Now()
 
 	// retrieve the data
 	err := c.DB.View(func(tx *bolt.Tx) error {
@@ -72,7 +71,9 @@ func (c *Cache) Get(text string) (bool, string) {
 			found = true
 			translation = string(val)
 
-			log.Debugln("Cache hit!", translation)
+			log.WithFields(log.Fields{
+				"time": time.Since(start),
+			}).Debugf("Cache: %q", translation)
 		}
 
 		return nil

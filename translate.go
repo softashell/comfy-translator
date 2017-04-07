@@ -36,7 +36,7 @@ func checkThrottle(lastReq time.Time) {
 	timePassed := time.Since(lastReq)
 	if timePassed < delay {
 		sleep := delay - timePassed
-		log.Debugf("Throttling request for %f seconds", sleep.Seconds())
+		//log.Debugf("Throttling request for %f seconds", sleep.Seconds())
 		time.Sleep(sleep)
 	}
 }
