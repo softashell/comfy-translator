@@ -31,8 +31,6 @@ type translateResponse struct {
 var cache *Cache
 
 func main() {
-	log.SetLevel(log.DebugLevel)
-
 	m := http.NewServeMux()
 
 	m.HandleFunc("/api/translate", translateHandler)
@@ -46,6 +44,11 @@ func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
+	}
+
+	debug := os.Getenv("DEBUG")
+	if len(debug) > 0 {
+		log.SetLevel(log.DebugLevel)
 	}
 
 	listenAddr := fmt.Sprintf("127.0.0.1:%s", port)
@@ -139,7 +142,7 @@ func translate(req translateRequest) string {
 		return req.Text
 	}
 
-	log.Printf("Input: %q", req.Text)
+	start := time.Now()
 
 	found, out := cache.Get(req.Text)
 
@@ -169,6 +172,10 @@ func translate(req translateRequest) string {
 			}
 		}
 	}
+
+	log.WithFields(log.Fields{
+		"time": time.Since(start),
+	}).Infof("%q -> %q", req.Text, out)
 
 	return out
 }
