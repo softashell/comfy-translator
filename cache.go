@@ -12,10 +12,10 @@ var (
 )
 
 type Cache struct {
-	DB *bolt.DB
+	database *bolt.DB
 }
 
-func NewCache() *Cache {
+func NewCache() (*Cache, error) {
 	db, err := bolt.Open("translation.db", 0600, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -29,15 +29,22 @@ func NewCache() *Cache {
 
 		return nil
 	})
-	check(err)
 
-	cache := &Cache{DB: db}
+	if err != nil {
+		return nil, err
+	}
 
-	return cache
+	cache := &Cache{database: db}
+
+	return cache, nil
+}
+
+func (c *Cache) Close() error {
+	return c.database.Close()
 }
 
 func (c *Cache) Put(text string, translation string) error {
-	err := c.DB.Update(func(tx *bolt.Tx) error {
+	err := c.database.Update(func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists(bucketName)
 		if err != nil {
 			return err
@@ -58,7 +65,7 @@ func (c *Cache) Get(text string) (bool, string) {
 	start := time.Now()
 
 	// retrieve the data
-	err := c.DB.View(func(tx *bolt.Tx) error {
+	err := c.database.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(bucketName)
 		if bucket == nil {
 			log.Fatalf("Bucket %q not found!", bucketName)

@@ -39,7 +39,11 @@ func main() {
 	//n.Use(negroni.NewLogger())
 	n.UseHandler(m)
 
-	cache = NewCache()
+	cache, err := NewCache()
+	if err != nil {
+		log.Fatalf("Failed to initialize translation cache: %v", err)
+	}
+	defer cache.Close()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -57,7 +61,7 @@ func main() {
 		"addr": listenAddr,
 	}).Info("Starting comfy translator")
 
-	err := graceful.RunWithErr(listenAddr, 60*time.Second, n)
+	err = graceful.RunWithErr(listenAddr, 60*time.Second, n)
 	if err != nil {
 		log.Fatal(err)
 	}
