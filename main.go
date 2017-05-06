@@ -39,7 +39,9 @@ func main() {
 	//n.Use(negroni.NewLogger())
 	n.UseHandler(m)
 
-	cache, err := NewCache()
+	var err error
+
+	cache, err = NewCache()
 	if err != nil {
 		log.Fatalf("Failed to initialize translation cache: %v", err)
 	}
