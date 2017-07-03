@@ -20,18 +20,19 @@ import (
 
 const (
 	userAgent = "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.10136"
-	delay     = time.Second * 15
+	delay     = time.Second * 10 // TODO: Needs tweaking
 
-	translatorURL = "https://www.bing.com/translator"
-	translatorAPI = "https://www.bing.com/translator/api/Translate/TranslateArray"
+	translatorURL = "http://www.bing.com/translator"
+	translatorAPI = "http://www.bing.com/translator/api/Translate/TranslateArray"
 )
 
 type Translate struct {
-	client           *http.Client
-	lastRequest      time.Time
-	mutex            *sync.Mutex
+	client      *http.Client
+	jar         *cookiejar.Jar
+	lastRequest time.Time
+	mutex       *sync.Mutex
+
 	cookieExpiration time.Time
-	jar              *cookiejar.Jar
 }
 
 type translateArrayRequest struct {
@@ -153,6 +154,7 @@ func (t Translate) Translate(req *translator.Request) (string, error) {
 	if len(response.Items) < 1 {
 		return "", fmt.Errorf("Empty response")
 	} else if len(response.Items) > 1 {
+		// Never has happened before, maybe I should panic if it does to avoid responses not handled properly
 		log.Warning("More than one item in response: %s", string(contents))
 	}
 

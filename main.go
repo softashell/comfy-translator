@@ -141,10 +141,19 @@ func translateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func startTranslators() {
-	translators = append(translators, google.New())
+	translators = append(translators,
+		google.New(),
 
-	// FIXME: Bing starts refusing connection pretty randomly and I can't tell what it doesn't like
-	translators = append(translators, bing.New())
+		// FIXME: Bing starts refusing connection pretty randomly and I can't tell what it doesn't like
+		bing.New(),
+	)
+
+	for _, t := range translators {
+		err := cache.createBucket(t.Name())
+		if err != nil {
+			log.Errorf("Failed to create missing bucket %q", t.Name())
+		}
+	}
 }
 
 func translate(req translator.Request) string {
@@ -167,7 +176,7 @@ func translate(req translator.Request) string {
 
 			found, out = cache.Get(source, req.Text)
 			if found {
-				source = source + "(cached)"
+				source = source + "(cache)"
 				break
 			}
 

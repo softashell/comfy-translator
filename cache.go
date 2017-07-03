@@ -7,10 +7,6 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-var (
-	bucketName = []byte("translations")
-)
-
 type Cache struct {
 	database *bolt.DB
 }
@@ -23,6 +19,11 @@ func NewCache() (*Cache, error) {
 	}
 
 	cache := &Cache{database: db}
+
+	err = cache.createBucket("translations")
+	if err != nil {
+		log.Error("Failed to create missing bucket \"translations\"")
+	}
 
 	return cache, nil
 }
@@ -79,4 +80,17 @@ func (c *Cache) Get(bucketName, text string) (bool, string) {
 	}
 
 	return found, translation
+}
+
+func (c *Cache) createBucket(bucketName string) error {
+	err := c.database.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err
 }
