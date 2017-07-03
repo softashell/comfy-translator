@@ -31,10 +31,10 @@ type Translate struct {
 	mutex       *sync.Mutex
 }
 
-func New() Translate {
-	log.Info("Starting google translate engine")
+func New() *Translate {
+	log.Info("Starting google translation engine")
 
-	return Translate{
+	return &Translate{
 		client:      &http.Client{Timeout: (10 * time.Second)},
 		lastRequest: time.Now(),
 		mutex:       &sync.Mutex{},

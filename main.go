@@ -11,11 +11,11 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/urfave/negroni"
 	"gopkg.in/tylerb/graceful.v1"
 
 	"gitgud.io/softashell/comfy-translator/translator"
+	"gitgud.io/softashell/comfy-translator/translator/bing"
 	"gitgud.io/softashell/comfy-translator/translator/google"
 )
 
@@ -143,9 +143,8 @@ func translateHandler(w http.ResponseWriter, r *http.Request) {
 func startTranslators() {
 	translators = append(translators, google.New())
 
-	for i, n := range translators {
-		log.Infof("%d %s", i, spew.Sdump(n))
-	}
+	// FIXME: Bing starts refusing connection pretty randomly and I can't tell what it doesn't like
+	translators = append(translators, bing.New())
 }
 
 func translate(req translator.Request) string {
@@ -158,6 +157,7 @@ func translate(req translator.Request) string {
 	var err error
 	var out, source string
 
+	// TODO: Old generic cache, probably should migrate contents to Google bucket since that's where most of it came from
 	found, out := cache.Get("translations", req.Text)
 	if !found {
 		for _, t := range translators {
@@ -173,7 +173,7 @@ func translate(req translator.Request) string {
 
 			out, err = t.Translate(&req)
 			if err != nil {
-				log.Warnf("%s: %i", source, err)
+				log.Warnf("%s: %s", source, err)
 				continue
 			}
 
@@ -182,9 +182,11 @@ func translate(req translator.Request) string {
 				if err != nil {
 					log.WithFields(log.Fields{
 						"err": err,
-					}).Error("Failed to save result to cache")
+					}).Errorf("Failed to save result to %s cache", source)
 				}
 			}
+
+			break
 		}
 
 		if len(out) < 1 {
