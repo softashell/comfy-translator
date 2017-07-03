@@ -6,10 +6,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-const (
-	delay = time.Second / 2
-)
-
 type Request struct {
 	Text string `json:"text"`
 	From string `json:"from"`
