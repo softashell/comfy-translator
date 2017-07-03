@@ -11,24 +11,18 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/urfave/negroni"
 	"gopkg.in/tylerb/graceful.v1"
+
+	"gitgud.io/softashell/comfy-translator/translator"
+	"gitgud.io/softashell/comfy-translator/translator/google"
 )
 
-type translateRequest struct {
-	Text string `json:"text"`
-	From string `json:"from"`
-	To   string `json:"to"`
-}
-
-type translateResponse struct {
-	Text            string `json:"text"`
-	From            string `json:"from"`
-	To              string `json:"to"`
-	TranslationText string `json:"translationText"`
-}
-
-var cache *Cache
+var (
+	cache       *Cache
+	translators []translator.Translator
+)
 
 func main() {
 	m := http.NewServeMux()
@@ -63,6 +57,8 @@ func main() {
 		"addr": listenAddr,
 	}).Info("Starting comfy translator")
 
+	startTranslators()
+
 	err = graceful.RunWithErr(listenAddr, 60*time.Second, n)
 	if err != nil {
 		log.Fatal(err)
@@ -72,7 +68,7 @@ func main() {
 func translateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	var req translateRequest
+	var req translator.Request
 
 	switch r.Method {
 	case "POST":
@@ -131,11 +127,12 @@ func translateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := translateResponse{}
-	response.TranslationText = translate(req)
-	response.From = req.From
-	response.To = req.To
-	response.Text = req.Text
+	response := translator.Response{
+		TranslationText: translate(req),
+		From:            req.From,
+		To:              req.To,
+		Text:            req.Text,
+	}
 
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -143,45 +140,66 @@ func translateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func translate(req translateRequest) string {
+func startTranslators() {
+	translators = append(translators, google.New())
+
+	for i, n := range translators {
+		log.Infof("%d %s", i, spew.Sdump(n))
+	}
+}
+
+func translate(req translator.Request) string {
 	if len(strings.TrimSpace(req.Text)) < 1 {
 		return req.Text
 	}
 
 	start := time.Now()
 
-	found, out := cache.Get(req.Text)
-
 	var err error
+	var out, source string
 
+	found, out := cache.Get("translations", req.Text)
 	if !found {
-		out, err = translateWithGoogle(&req)
-		if err != nil {
-			log.Warning("Google: ", err)
-			out, err = translateWithTransltr(&req)
+		for _, t := range translators {
+			source = t.Name()
+
+			log.Debugf("Translating with %s", source)
+
+			found, out = cache.Get(source, req.Text)
+			if found {
+				source = source + "(cached)"
+				break
+			}
+
+			out, err = t.Translate(&req)
+			if err != nil {
+				log.Warnf("%s: %i", source, err)
+				continue
+			}
+
+			if len(out) > 0 {
+				err = cache.Put(source, req.Text, out)
+				if err != nil {
+					log.WithFields(log.Fields{
+						"err": err,
+					}).Error("Failed to save result to cache")
+				}
+			}
 		}
 
-		if err != nil {
-			log.Warning("Transltr: ", err)
-
-			// Not going to cache this since it's probably garbage as well
-			out, err = translateWithHonyaku(&req)
-			if err != nil {
-				log.Warning("Honyaku: ", err)
-			}
-		} else if len(out) > 0 {
-			err = cache.Put(req.Text, out)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"err": err,
-				}).Error("Failed to save result to cache")
-			}
+		if len(out) < 1 {
+			// TODO: Return original text or try to handle error in handler
+			log.Errorf("All services failed to translate %q", req.Text)
 		}
+	} else {
+		source = "Cache"
 	}
 
 	log.WithFields(log.Fields{
-		"time": time.Since(start),
+		"time":   time.Since(start),
+		"source": source,
 	}).Infof("%q -> %q", req.Text, out)
 
 	return out
+
 }

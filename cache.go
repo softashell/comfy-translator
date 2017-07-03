@@ -19,18 +19,6 @@ func NewCache() (*Cache, error) {
 	db, err := bolt.Open("translation.db", 0600, nil)
 	if err != nil {
 		log.Fatal(err)
-	}
-
-	err = db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketName)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	if err != nil {
 		return nil, err
 	}
 
@@ -43,9 +31,9 @@ func (c *Cache) Close() error {
 	return c.database.Close()
 }
 
-func (c *Cache) Put(text string, translation string) error {
+func (c *Cache) Put(bucketName, text, translation string) error {
 	err := c.database.Update(func(tx *bolt.Tx) error {
-		bucket, err := tx.CreateBucketIfNotExists(bucketName)
+		bucket, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		if err != nil {
 			return err
 		}
@@ -58,7 +46,7 @@ func (c *Cache) Put(text string, translation string) error {
 	return err
 }
 
-func (c *Cache) Get(text string) (bool, string) {
+func (c *Cache) Get(bucketName, text string) (bool, string) {
 	var translation string
 	var found bool
 
@@ -66,9 +54,9 @@ func (c *Cache) Get(text string) (bool, string) {
 
 	// retrieve the data
 	err := c.database.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(bucketName)
+		bucket := tx.Bucket([]byte(bucketName))
 		if bucket == nil {
-			log.Fatalf("Bucket %q not found!", bucketName)
+			log.Warnf("Bucket %q not found! (Probably nothing has been saved to it yet)", bucketName)
 			return nil
 		}
 
@@ -85,7 +73,10 @@ func (c *Cache) Get(text string) (bool, string) {
 
 		return nil
 	})
-	check(err)
+
+	if err != nil {
+		log.Error(err)
+	}
 
 	return found, translation
 }
