@@ -3,7 +3,7 @@ package translator
 import (
 	"time"
 
-	"github.com/ewhal/nyaa/util/log"
+	log "github.com/Sirupsen/logrus"
 )
 
 const (
