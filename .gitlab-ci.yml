@@ -3,10 +3,10 @@ image: golang:latest
 before_script:
   - go-wrapper download
 
-test:
-  dependencies: []
-  script:
-    - go test ./...
+#test:
+#  dependencies: []
+#  script:
+#    - go test ./...
 
 build:win64:
   stage: build
