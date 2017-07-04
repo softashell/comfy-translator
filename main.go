@@ -15,7 +15,6 @@ import (
 	"gopkg.in/tylerb/graceful.v1"
 
 	"gitgud.io/softashell/comfy-translator/translator"
-	"gitgud.io/softashell/comfy-translator/translator/bing"
 	"gitgud.io/softashell/comfy-translator/translator/google"
 )
 
@@ -145,7 +144,7 @@ func startTranslators() {
 		google.New(),
 
 		// FIXME: Bing starts refusing connection pretty randomly and I can't tell what it doesn't like
-		bing.New(),
+		//bing.New(),
 	)
 
 	for _, t := range translators {
