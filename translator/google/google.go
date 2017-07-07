@@ -116,19 +116,24 @@ func (t Translate) Translate(req *translator.Request) (string, error) {
 		return "", fmt.Errorf("Bad response %q", out)
 	}
 
-	out = out2
-
-	out = strings.Replace(out, "\\\\", "\\", -1)
-
-	// Replace escaped quotes
-	out = strings.Replace(out, "\\\"", "\"", -1)
-
-	// Replace escaped newlines
-	out = strings.Replace(out, "\\n", "\n", -1)
+	out = cleanText(out2)
 
 	log.WithFields(log.Fields{
 		"time": time.Since(start),
 	}).Debugf("Google: %q", out)
 
 	return out, nil
+}
+
+func cleanText(text string) string {
+	text = strings.Replace(text, "\\\\", "\\", -1)
+
+	// Replace escaped quotes and newlines
+	text = strings.Replace(text, "\\\"", "\"", -1)
+	text = strings.Replace(text, "\\n", "\n", -1)
+
+	// Replace raw characters
+	text = strings.Replace(text, "\\u0026", "＆", -1)
+
+	return text
 }
