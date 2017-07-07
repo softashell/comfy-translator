@@ -134,6 +134,8 @@ func cleanText(text string) string {
 
 	// Replace raw characters
 	text = strings.Replace(text, "\\u0026", "＆", -1)
+	text = strings.Replace(text, "\\u003c", "<", -1)
+	text = strings.Replace(text, "\\u003e", ">", -1)
 
 	return text
 }
