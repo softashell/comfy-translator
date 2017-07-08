@@ -38,24 +38,25 @@ func New() *Translate {
 		client:      &http.Client{Timeout: (10 * time.Second)},
 		lastRequest: time.Now(),
 		mutex:       &sync.Mutex{},
+		enabled:     false,
 	}
 }
 
-func (t Translate) Name() string {
+func (t *Translate) Name() string {
 	return "Google"
 }
 
-func (t Translate) Start(c config.TranslatorConfig) error {
+func (t *Translate) Start(c config.TranslatorConfig) error {
 	t.enabled = true
 
 	return nil
 }
 
-func (t Translate) Enabled() bool {
+func (t *Translate) Enabled() bool {
 	return t.enabled
 }
 
-func (t Translate) Translate(req *translator.Request) (string, error) {
+func (t *Translate) Translate(req *translator.Request) (string, error) {
 	start := time.Now()
 
 	t.mutex.Lock()

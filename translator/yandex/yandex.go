@@ -45,11 +45,11 @@ func New() *Translate {
 	}
 }
 
-func (t Translate) Name() string {
+func (t *Translate) Name() string {
 	return "Yandex"
 }
 
-func (t Translate) Start(c config.TranslatorConfig) error {
+func (t *Translate) Start(c config.TranslatorConfig) error {
 	t.apiKey = c.Key
 	if len(t.apiKey) < 1 || !strings.HasPrefix(t.apiKey, "trnsl.") {
 		return fmt.Errorf("%s: Invalid api key provided, edit comfy-translator.toml to disable or change key", t.Name())
@@ -60,11 +60,11 @@ func (t Translate) Start(c config.TranslatorConfig) error {
 	return nil
 }
 
-func (t Translate) Enabled() bool {
+func (t *Translate) Enabled() bool {
 	return t.enabled
 }
 
-func (t Translate) Translate(req *translator.Request) (string, error) {
+func (t *Translate) Translate(req *translator.Request) (string, error) {
 	start := time.Now()
 
 	t.mutex.Lock()

@@ -76,11 +76,11 @@ func New() *Translate {
 	}
 }
 
-func (t Translate) Name() string {
+func (t *Translate) Name() string {
 	return "Bing"
 }
 
-func (t Translate) Start(c config.TranslatorConfig) error {
+func (t *Translate) Start(c config.TranslatorConfig) error {
 	if time.Now().After(t.cookieExpiration) {
 		err := t.getCookies()
 		if err != nil {
@@ -93,11 +93,11 @@ func (t Translate) Start(c config.TranslatorConfig) error {
 	return nil
 }
 
-func (t Translate) Enabled() bool {
+func (t *Translate) Enabled() bool {
 	return t.enabled
 }
 
-func (t Translate) Translate(req *translator.Request) (string, error) {
+func (t *Translate) Translate(req *translator.Request) (string, error) {
 	log.Debugf("Translating %q from %q to %q", req.Text, req.From, req.To)
 
 	t.mutex.Lock()
@@ -181,7 +181,7 @@ func (t Translate) Translate(req *translator.Request) (string, error) {
 	return response.Items[0].Text, nil
 }
 
-func (t Translate) getCookies() error {
+func (t *Translate) getCookies() error {
 	log.Debug("Getting bing cookies")
 
 	var URL *url.URL

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sort"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -72,7 +71,7 @@ func main() {
 }
 
 func startTranslators() {
-	trans := []translator.Translator{
+	t := []translator.Translator{
 		google.New(),
 		bing.New(),   // FIXME: Bing starts refusing connection pretty randomly and I can't tell what it doesn't like
 		yandex.New(), // Pretty bad quality
@@ -80,31 +79,56 @@ func startTranslators() {
 
 	log.Info("Starting translation engines")
 
-	for _, t := range trans {
-		c, found := conf.Translator[t.Name()]
+	for i := range t {
+		name := t[i].Name()
+
+		c, found := conf.Translator[name]
 		if !found {
-			log.Errorf("Couldn't find config for %q", t.Name())
+			log.Errorf("Couldn't find config for %q", name)
 		}
 
 		if c.Enabled {
-			log.Infof("%s: Starting", t.Name())
-			err := t.Start(c)
+			log.Infof("%s: Starting", name)
+			err := t[i].Start(c)
 			if err != nil {
 				log.Warn(err)
 			}
+
+			if t[i].Enabled() {
+				log.Infof("%s: Should be started", name)
+			} else {
+				log.Infof("%s: Did not start", name)
+			}
 		} else {
-			log.Infof("%s: Disabled in config", t.Name())
+			log.Infof("%s: Disabled in config", name)
 		}
 
-		err := cache.createBucket(t.Name())
+		err := cache.createBucket(name)
 		if err != nil {
-			log.Errorf("Failed to create missing bucket %q", t.Name())
+			log.Errorf("Failed to create missing bucket %q", name)
+		}
+	}
+	/*
+
+		sort.Slice(t, func(i, j int) bool {
+			return conf.Translator[t[i].Name()].Priority < conf.Translator[t[j].Name()].Priority
+		})
+	*/
+
+	var order string
+	for i := range t {
+		order += t[i].Name()
+
+		if !t[i].Enabled() {
+			order += " (only cache)"
+		}
+
+		if i+i < len(t) {
+			order += ", "
 		}
 	}
 
-	sort.Slice(trans, func(i, j int) bool {
-		return conf.Translator[trans[i].Name()].Priority < conf.Translator[trans[j].Name()].Priority
-	})
+	log.Infof("Translation order: %s", order)
 
-	translators = trans
+	translators = t
 }
