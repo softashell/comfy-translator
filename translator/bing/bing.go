@@ -10,10 +10,11 @@ import (
 	"sync"
 	"time"
 
+	"net/http/cookiejar"
+
 	"golang.org/x/net/publicsuffix"
 
 	log "github.com/Sirupsen/logrus"
-	cookiejar "github.com/juju/persistent-cookiejar"
 
 	"gitgud.io/softashell/comfy-translator/config"
 	"gitgud.io/softashell/comfy-translator/translator"
@@ -21,7 +22,7 @@ import (
 
 const (
 	userAgent = "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.10136"
-	delay     = time.Second * 10 // TODO: Needs tweaking
+	delay     = time.Second * 20 // TODO: Needs tweaking
 
 	translatorURL = "http://www.bing.com/translator"
 	translatorAPI = "http://www.bing.com/translator/api/Translate/TranslateArray"
@@ -30,9 +31,10 @@ const (
 type Translate struct {
 	enabled     bool
 	client      *http.Client
-	jar         *cookiejar.Jar
 	lastRequest time.Time
 	mutex       *sync.Mutex
+
+	requests int
 
 	cookieExpiration time.Time
 }
@@ -53,13 +55,10 @@ type translateResponse struct {
 func New() *Translate {
 	jar, err := cookiejar.New(&cookiejar.Options{
 		PublicSuffixList: publicsuffix.List,
-		Filename:         cookiejar.DefaultCookieFile(),
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	cookieExpiration := getExpiration(jar)
 
 	client := &http.Client{
 		Jar:     jar,
@@ -71,8 +70,7 @@ func New() *Translate {
 		lastRequest: time.Now(),
 		mutex:       &sync.Mutex{},
 
-		cookieExpiration: cookieExpiration,
-		jar:              jar,
+		cookieExpiration: time.Now(),
 	}
 }
 
@@ -81,11 +79,9 @@ func (t *Translate) Name() string {
 }
 
 func (t *Translate) Start(c config.TranslatorConfig) error {
-	if time.Now().After(t.cookieExpiration) {
-		err := t.getCookies()
-		if err != nil {
-			return err
-		}
+	err := t.getCookies()
+	if err != nil {
+		return err
 	}
 
 	t.enabled = true
@@ -105,7 +101,7 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 
 	translator.CheckThrottle(t.lastRequest, delay)
 
-	if time.Now().After(t.cookieExpiration) {
+	if time.Now().After(t.cookieExpiration) || t.requests > 3 {
 		err := t.getCookies()
 		if err != nil {
 			return "", err
@@ -146,6 +142,7 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 	r.Close = true
 
 	t.lastRequest = time.Now()
+	t.requests++
 
 	resp, err := t.client.Do(r)
 	if err != nil {
@@ -178,11 +175,17 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 		log.Warning("More than one item in response: %s", string(contents))
 	}
 
-	return response.Items[0].Text, nil
+	var out string
+
+	for i := range response.Items {
+		out += response.Items[i].Text
+	}
+
+	return out, nil
 }
 
 func (t *Translate) getCookies() error {
-	log.Debug("Getting bing cookies")
+	log.Print("Getting bing cookies")
 
 	var URL *url.URL
 	URL, err := url.Parse(translatorURL)
@@ -203,6 +206,9 @@ func (t *Translate) getCookies() error {
 	resp, err := t.client.Do(r)
 	if err != nil {
 		log.Errorln("Failed to do request", err)
+
+		t.cookieExpiration = time.Now()
+
 		return err
 	}
 	defer resp.Body.Close()
@@ -211,30 +217,7 @@ func (t *Translate) getCookies() error {
 		return fmt.Errorf("%s", resp.Status)
 	}
 
-	t.cookieExpiration = getExpiration(t.jar)
-
-	err = t.jar.Save()
-	if err != nil {
-		log.Error(err)
-	}
+	t.cookieExpiration = time.Now().Add(time.Minute * 10)
 
 	return nil
-}
-
-func getExpiration(jar *cookiejar.Jar) time.Time {
-	var URL *url.URL
-	URL, err := url.Parse("http://www.bing.com/translator")
-	if err != nil {
-		panic(err)
-	}
-
-	if len(jar.Cookies(URL)) > 3 {
-		for _, c := range jar.Cookies(URL) {
-			if c.Name == "MUID" {
-				return c.Expires
-			}
-		}
-	}
-
-	return time.Now()
 }
