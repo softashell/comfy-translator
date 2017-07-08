@@ -27,6 +27,7 @@ var (
 )
 
 type Translate struct {
+	enabled     bool
 	client      *http.Client
 	lastRequest time.Time
 	mutex       *sync.Mutex
@@ -45,7 +46,13 @@ func (t Translate) Name() string {
 }
 
 func (t Translate) Start(c config.TranslatorConfig) error {
+	t.enabled = true
+
 	return nil
+}
+
+func (t Translate) Enabled() bool {
+	return t.enabled
 }
 
 func (t Translate) Translate(req *translator.Request) (string, error) {

@@ -23,6 +23,7 @@ const (
 )
 
 type Translate struct {
+	enabled     bool
 	client      *http.Client
 	lastRequest time.Time
 	mutex       *sync.Mutex
@@ -54,7 +55,13 @@ func (t Translate) Start(c config.TranslatorConfig) error {
 		return fmt.Errorf("%s: Invalid api key provided, edit comfy-translator.toml to disable or change key", t.Name())
 	}
 
+	t.enabled = true
+
 	return nil
+}
+
+func (t Translate) Enabled() bool {
+	return t.enabled
 }
 
 func (t Translate) Translate(req *translator.Request) (string, error) {

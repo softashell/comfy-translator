@@ -33,6 +33,10 @@ func translate(req translator.Request) string {
 				break
 			}
 
+			if !t.Enabled() {
+				continue
+			}
+
 			out, err = t.Translate(&req)
 			if err != nil {
 				log.Warnf("%s: %s", source, err)

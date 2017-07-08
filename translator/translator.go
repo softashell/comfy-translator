@@ -23,6 +23,7 @@ type Response struct {
 type Translator interface {
 	Name() string
 	Start(c config.TranslatorConfig) error
+	Enabled() bool
 	Translate(*Request) (string, error)
 }
 
