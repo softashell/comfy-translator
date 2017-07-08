@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -71,15 +72,15 @@ func main() {
 }
 
 func startTranslators() {
-	translators = append(translators,
+	trans := []translator.Translator{
 		google.New(),
 		bing.New(),   // FIXME: Bing starts refusing connection pretty randomly and I can't tell what it doesn't like
 		yandex.New(), // Pretty bad quality
-	)
+	}
 
 	log.Info("Starting translation engines")
 
-	for _, t := range translators {
+	for _, t := range trans {
 		c, found := conf.Translator[t.Name()]
 		if !found {
 			log.Errorf("Couldn't find config for %q", t.Name())
@@ -100,4 +101,10 @@ func startTranslators() {
 			log.Errorf("Failed to create missing bucket %q", t.Name())
 		}
 	}
+
+	sort.Slice(trans, func(i, j int) bool {
+		return conf.Translator[trans[i].Name()].Priority < conf.Translator[trans[j].Name()].Priority
+	})
+
+	translators = trans
 }
