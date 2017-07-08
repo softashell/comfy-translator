@@ -15,6 +15,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	cookiejar "github.com/juju/persistent-cookiejar"
 
+	"gitgud.io/softashell/comfy-translator/config"
 	"gitgud.io/softashell/comfy-translator/translator"
 )
 
@@ -49,8 +50,6 @@ type translateResponse struct {
 }
 
 func New() *Translate {
-	log.Info("Starting bing translation engine")
-
 	jar, err := cookiejar.New(&cookiejar.Options{
 		PublicSuffixList: publicsuffix.List,
 		Filename:         cookiejar.DefaultCookieFile(),
@@ -67,9 +66,10 @@ func New() *Translate {
 	}
 
 	return &Translate{
-		client:           client,
-		lastRequest:      time.Now(),
-		mutex:            &sync.Mutex{},
+		client:      client,
+		lastRequest: time.Now(),
+		mutex:       &sync.Mutex{},
+
 		cookieExpiration: cookieExpiration,
 		jar:              jar,
 	}
@@ -79,18 +79,31 @@ func (t Translate) Name() string {
 	return "Bing"
 }
 
+func (t Translate) Start(c config.TranslatorConfig) error {
+	if time.Now().After(t.cookieExpiration) {
+		err := t.getCookies()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (t Translate) Translate(req *translator.Request) (string, error) {
+	log.Debugf("Translating %q from %q to %q", req.Text, req.From, req.To)
+
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	translator.CheckThrottle(t.lastRequest, delay)
+
 	if time.Now().After(t.cookieExpiration) {
 		err := t.getCookies()
 		if err != nil {
 			return "", err
 		}
 	}
-
-	log.Debugf("Translating %q from %q to %q", req.Text, req.From, req.To)
-
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
 
 	translator.CheckThrottle(t.lastRequest, delay)
 
@@ -163,11 +176,6 @@ func (t Translate) Translate(req *translator.Request) (string, error) {
 
 func (t Translate) getCookies() error {
 	log.Debug("Getting bing cookies")
-
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	translator.CheckThrottle(t.lastRequest, delay)
 
 	var URL *url.URL
 	URL, err := url.Parse(translatorURL)

@@ -3,6 +3,7 @@ package translator
 import (
 	"time"
 
+	"gitgud.io/softashell/comfy-translator/config"
 	log "github.com/Sirupsen/logrus"
 )
 
@@ -21,6 +22,7 @@ type Response struct {
 
 type Translator interface {
 	Name() string
+	Start(c config.TranslatorConfig) error
 	Translate(*Request) (string, error)
 }
 

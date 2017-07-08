@@ -11,8 +11,8 @@ type Cache struct {
 	database *bolt.DB
 }
 
-func NewCache() (*Cache, error) {
-	db, err := bolt.Open("translation.db", 0600, nil)
+func NewCache(filePath string) (*Cache, error) {
+	db, err := bolt.Open(filePath, 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 		return nil, err

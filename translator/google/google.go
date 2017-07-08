@@ -12,6 +12,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"gitgud.io/softashell/comfy-translator/config"
 	"gitgud.io/softashell/comfy-translator/translator"
 )
 
@@ -32,8 +33,6 @@ type Translate struct {
 }
 
 func New() *Translate {
-	log.Info("Starting google translation engine")
-
 	return &Translate{
 		client:      &http.Client{Timeout: (10 * time.Second)},
 		lastRequest: time.Now(),
@@ -43,6 +42,10 @@ func New() *Translate {
 
 func (t Translate) Name() string {
 	return "Google"
+}
+
+func (t Translate) Start(c config.TranslatorConfig) error {
+	return nil
 }
 
 func (t Translate) Translate(req *translator.Request) (string, error) {
