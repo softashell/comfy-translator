@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -108,12 +109,10 @@ func startTranslators() {
 			log.Errorf("Failed to create missing bucket %q", name)
 		}
 	}
-	/*
 
-		sort.Slice(t, func(i, j int) bool {
-			return conf.Translator[t[i].Name()].Priority < conf.Translator[t[j].Name()].Priority
-		})
-	*/
+	sort.Slice(t, func(i, j int) bool {
+		return conf.Translator[t[i].Name()].Priority < conf.Translator[t[j].Name()].Priority
+	})
 
 	var order string
 	for i := range t {
