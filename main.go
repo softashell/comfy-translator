@@ -11,6 +11,7 @@ import (
 	"github.com/urfave/negroni"
 	"gopkg.in/tylerb/graceful.v1"
 
+	"gitgud.io/softashell/comfy-translator/cache"
 	"gitgud.io/softashell/comfy-translator/config"
 	"gitgud.io/softashell/comfy-translator/translator"
 	"gitgud.io/softashell/comfy-translator/translator/bing"
@@ -19,7 +20,7 @@ import (
 )
 
 var (
-	cache       *Cache
+	c           *cache.Cache
 	conf        *config.Config
 	translators []translator.Translator
 )
@@ -46,11 +47,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	cache, err = NewCache(conf.Database.Path)
+	c, err = cache.NewCache(conf.Database.Path)
 	if err != nil {
 		log.Fatalf("Failed to initialize translation cache: %v", err)
 	}
-	defer cache.Close()
+	defer c.Close()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -83,14 +84,14 @@ func startTranslators() {
 	for i := range t {
 		name := t[i].Name()
 
-		c, found := conf.Translator[name]
+		conf, found := conf.Translator[name]
 		if !found {
 			log.Errorf("Couldn't find config for %q", name)
 		}
 
-		if c.Enabled {
+		if conf.Enabled {
 			log.Infof("%s: Starting", name)
-			err := t[i].Start(c)
+			err := t[i].Start(conf)
 			if err != nil {
 				log.Warn(err)
 			}
@@ -104,7 +105,7 @@ func startTranslators() {
 			log.Infof("%s: Disabled in config", name)
 		}
 
-		err := cache.createBucket(name)
+		err := c.CreateBucket(name)
 		if err != nil {
 			log.Errorf("Failed to create missing bucket %q", name)
 		}

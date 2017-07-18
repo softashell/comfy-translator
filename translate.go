@@ -20,14 +20,14 @@ func translate(req translator.Request) string {
 	var out, source string
 
 	// TODO: Old generic cache, probably should migrate contents to Google bucket since that's where most of it came from
-	found, out := cache.Get("translations", req.Text)
+	found, out := c.Get("translations", req.Text)
 	if !found {
 		for _, t := range translators {
 			source = t.Name()
 
 			log.Debugf("Translating with %s", source)
 
-			found, out = cache.Get(source, req.Text)
+			found, out = c.Get(source, req.Text)
 			if found {
 				source = source + "(cache)"
 				break
@@ -44,7 +44,7 @@ func translate(req translator.Request) string {
 			}
 
 			if len(out) > 0 {
-				err = cache.Put(source, req.Text, out)
+				err = c.Put(source, req.Text, out)
 				if err != nil {
 					log.WithFields(log.Fields{
 						"err": err,

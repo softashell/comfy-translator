@@ -1,4 +1,4 @@
-package main
+package cache
 
 import (
 	"time"
@@ -8,7 +8,7 @@ import (
 )
 
 type Cache struct {
-	database *bolt.DB
+	db *bolt.DB
 }
 
 func NewCache(filePath string) (*Cache, error) {
@@ -18,9 +18,9 @@ func NewCache(filePath string) (*Cache, error) {
 		return nil, err
 	}
 
-	cache := &Cache{database: db}
+	cache := &Cache{db: db}
 
-	err = cache.createBucket("translations")
+	err = cache.CreateBucket("translations")
 	if err != nil {
 		log.Error("Failed to create missing bucket \"translations\"")
 	}
@@ -29,11 +29,11 @@ func NewCache(filePath string) (*Cache, error) {
 }
 
 func (c *Cache) Close() error {
-	return c.database.Close()
+	return c.db.Close()
 }
 
 func (c *Cache) Put(bucketName, text, translation string) error {
-	err := c.database.Update(func(tx *bolt.Tx) error {
+	err := c.db.Update(func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		if err != nil {
 			return err
@@ -54,7 +54,7 @@ func (c *Cache) Get(bucketName, text string) (bool, string) {
 	start := time.Now()
 
 	// retrieve the data
-	err := c.database.View(func(tx *bolt.Tx) error {
+	err := c.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(bucketName))
 		if bucket == nil {
 			log.Warnf("Bucket %q not found! (Probably nothing has been saved to it yet)", bucketName)
@@ -82,8 +82,8 @@ func (c *Cache) Get(bucketName, text string) (bool, string) {
 	return found, translation
 }
 
-func (c *Cache) createBucket(bucketName string) error {
-	err := c.database.Update(func(tx *bolt.Tx) error {
+func (c *Cache) CreateBucket(bucketName string) error {
+	err := c.db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		if err != nil {
 			return err
