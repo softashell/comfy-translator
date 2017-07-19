@@ -136,7 +136,9 @@ func (c *Cache) getBuckets() ([][]byte, error) {
 
 	err := c.db.View(func(tx *bolt.Tx) error {
 		if err := tx.ForEach(func(name []byte, _ *bolt.Bucket) error {
-			buckets = append(buckets, name)
+			if string(name) != metadataName {
+				buckets = append(buckets, name)
+			}
 			return nil
 		}); err != nil {
 			return err
