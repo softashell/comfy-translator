@@ -3,11 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
-
-	log "github.com/Sirupsen/logrus"
 
 	"gitgud.io/softashell/comfy-translator/translator"
 )
@@ -19,17 +15,7 @@ func translateHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "POST":
-		body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
-		if err != nil {
-			panic(err)
-		}
-		if err := r.Body.Close(); err != nil {
-			panic(err)
-		}
-
-		if err := json.Unmarshal(body, &req); err != nil {
-			log.Errorf("%+v %s", req, string(body))
-
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			w.WriteHeader(http.StatusUnprocessableEntity)
 
 			if err := json.NewEncoder(w).Encode(err); err != nil {
@@ -38,6 +24,7 @@ func translateHandler(w http.ResponseWriter, r *http.Request) {
 
 			return
 		}
+		defer r.Body.Close()
 	case "GET":
 		if err := r.ParseForm(); err != nil {
 			panic(err)
