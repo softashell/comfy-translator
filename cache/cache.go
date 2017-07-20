@@ -19,7 +19,7 @@ type Cache struct {
 
 type cacheItem struct {
 	Translation string `json:"t"`
-	Error       error  `json:"e,omitempty"`
+	Error       string `json:"e,omitempty"`
 	Timestamp   int64  `json:"u,omitempty"`
 }
 
@@ -47,7 +47,7 @@ func (c *Cache) Close() error {
 	return c.db.Close()
 }
 
-func (c *Cache) Put(bucketName, text, translation string, cerr error) error {
+func (c *Cache) Put(bucketName, text, translation, cerr string) error {
 	err := c.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		if b == nil {
@@ -87,7 +87,9 @@ func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 
 		buf := bytes.NewReader(val)
 		if err := json.NewDecoder(buf).Decode(&i); err != nil {
-			return err
+			// try to ignore decoding error and just act like we found nothing
+			log.Errorf("%v : %s", err, string(val))
+			return nil
 		}
 
 		found = true
@@ -104,12 +106,12 @@ func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 		return "", false, nil
 	}
 
-	if i.Error != nil {
+	if i.Error != "" {
 		if time.Since(time.Unix(i.Timestamp, 0)) > 6*time.Hour {
 			return "", false, nil
 		}
 
-		return "", true, i.Error
+		return "", true, fmt.Errorf("%s", i.Error)
 	}
 
 	return i.Translation, found, nil
