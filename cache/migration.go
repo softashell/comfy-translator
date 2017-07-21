@@ -8,9 +8,11 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/boltdb/bolt"
+
+	"gitgud.io/softashell/comfy-translator/translator/google"
 )
 
-const latestVersion = 2
+const latestVersion = 3
 
 func (c *Cache) migrateDatabase() error {
 	if c.meta.Version == latestVersion {
@@ -40,6 +42,8 @@ func (c *Cache) migrate(ver int) {
 		err = c.migration1()
 	case 2:
 		err = c.migration2()
+	case 3:
+		err = c.migration3()
 	}
 
 	log := log.WithFields(log.Fields{
@@ -122,6 +126,42 @@ func (c *Cache) migration2() error {
 				if err := b.Put(k, buf.Bytes()); err != nil {
 					return err
 				}
+			}
+		}
+
+		return nil
+	})
+
+	return err
+}
+
+func (c *Cache) migration3() error {
+	// clean google cache
+
+	var i cacheItem
+
+	err := c.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("Google"))
+		if b == nil {
+			return nil
+		}
+
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			if v == nil {
+				continue
+			}
+
+			buf := bytes.NewReader(v)
+			if err := json.NewDecoder(buf).Decode(&i); err != nil {
+				log.Errorf("%v : %s", err, string(v))
+				b.Delete(k)
+				continue
+			}
+
+			if len(i.Translation) > 0 && google.IsTranslationGarbage(i.Translation) {
+				log.Debugf("Removing: %q => %q", string(k), i.Translation)
+				b.Delete(k)
 			}
 		}
 
