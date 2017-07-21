@@ -107,7 +107,7 @@ func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 	}
 
 	if i.Error != "" {
-		if time.Since(time.Unix(i.Timestamp, 0)) > 6*time.Hour {
+		if time.Since(time.Unix(i.Timestamp, 0)) > 12*time.Hour {
 			return "", false, nil
 		}
 
