@@ -12,6 +12,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"unicode"
+
 	"gitgud.io/softashell/comfy-translator/config"
 	"gitgud.io/softashell/comfy-translator/translator"
 )
@@ -124,10 +126,14 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 	// Delete garbage output which often leaves the output empty, fix your shit google tbh
 	out2 := garbageRegex.ReplaceAllString(out, "")
 	if len(out) < 1 || (len(out2) < len(out)/2) {
-		return "", fmt.Errorf("Bad response %q", out)
+		return "", fmt.Errorf("garbage translation: %q => %q", req.Text, out)
 	}
 
 	out = cleanText(out2)
+
+	if IsTranslationGarbage(out) {
+		return "", fmt.Errorf("garbage translation: %q => %q", req.Text, out)
+	}
 
 	log.WithFields(log.Fields{
 		"time": time.Since(start),
@@ -149,4 +155,32 @@ func cleanText(text string) string {
 	text = strings.Replace(text, "\\u003e", ">", -1)
 
 	return text
+}
+
+func IsTranslationGarbage(text string) bool {
+	if strings.Contains(text, "Powered by Discuz!") {
+		return true
+	}
+
+	var rest int
+	var japanese int
+
+	for _, r := range text {
+		if unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Han, r) {
+			japanese++
+			continue
+		}
+
+		if unicode.IsSpace(r) {
+			continue
+		}
+
+		rest++
+	}
+
+	if japanese > rest {
+		return true
+	}
+
+	return false
 }
