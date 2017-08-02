@@ -158,7 +158,8 @@ func cleanText(text string) string {
 }
 
 func IsTranslationGarbage(text string) bool {
-	if strings.Contains(text, "Powered by Discuz!") {
+	text = strings.ToLower(text)
+	if strings.Contains(text, "powered by discuz") || strings.Contains(text, "powered by translate") {
 		return true
 	}
 
