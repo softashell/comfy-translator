@@ -5,10 +5,20 @@ import (
 	"fmt"
 	"time"
 
+	"gitgud.io/softashell/comfy-translator/translator"
+
 	"bytes"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/boltdb/bolt"
+)
+
+type translationError int
+
+const (
+	errorNone           translationError = iota // Everything is fine
+	errorMinor                                  // Connection timed out or something like that
+	errorBadTranslation                         // Returned really bad translation
 )
 
 type Cache struct {
@@ -18,9 +28,10 @@ type Cache struct {
 }
 
 type cacheItem struct {
-	Translation string `json:"t"`
-	Error       string `json:"e,omitempty"`
-	Timestamp   int64  `json:"u,omitempty"`
+	Translation string           `json:"t"`
+	ErrorCode   translationError `json:"c,omitempty"`
+	ErrorText   string           `json:"e,omitempty"`
+	Timestamp   int64            `json:"u,omitempty"`
 }
 
 func NewCache(filePath string) (*Cache, error) {
@@ -47,17 +58,32 @@ func (c *Cache) Close() error {
 	return c.db.Close()
 }
 
-func (c *Cache) Put(bucketName, text, translation, cerr string) error {
+func (c *Cache) Put(bucketName, text, translation string, cerr error) error {
 	err := c.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		if b == nil {
 			return fmt.Errorf("bucket doesn't exist??")
 		}
 
+		errorCode := errorNone
+		errorText := ""
+
+		if cerr != nil {
+			errorText = cerr.Error()
+
+			switch cerr.(type) {
+			case translator.BadTranslationError:
+				errorCode = errorBadTranslation
+			default:
+				errorCode = errorMinor
+			}
+		}
+
 		buf := bytes.NewBuffer(nil)
 		if err := json.NewEncoder(buf).Encode(cacheItem{
 			Translation: translation,
-			Error:       cerr,
+			ErrorCode:   errorCode,
+			ErrorText:   errorText,
 			Timestamp:   time.Now().UTC().Unix(),
 		}); err != nil {
 			return err
@@ -106,12 +132,14 @@ func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 		return "", false, nil
 	}
 
-	if i.Error != "" {
-		if time.Since(time.Unix(i.Timestamp, 0)) > 12*time.Hour {
+	if i.ErrorCode != errorNone {
+		errorTime := time.Unix(i.Timestamp, 0)
+
+		if time.Since(errorTime) > getCacheExpiration(i.ErrorCode) {
 			return "", false, nil
 		}
 
-		return "", true, fmt.Errorf("%s", i.Error)
+		return "", true, fmt.Errorf("%s", i.ErrorText)
 	}
 
 	return i.Translation, found, nil
@@ -128,4 +156,19 @@ func (c *Cache) CreateBucket(bucketName string) error {
 	})
 
 	return err
+}
+
+func getCacheExpiration(errorCode translationError) time.Duration {
+	switch errorCode {
+	case errorNone:
+		return (24 * time.Hour) * 365
+	case errorMinor:
+		return time.Hour / 2
+	case errorBadTranslation:
+		return 24 * time.Hour
+	}
+
+	log.Fatalf("unknow error code: %d", errorCode)
+
+	return time.Second
 }

@@ -126,13 +126,19 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 	// Delete garbage output which often leaves the output empty, fix your shit google tbh
 	out2 := garbageRegex.ReplaceAllString(out, "")
 	if len(out) < 1 || (len(out2) < len(out)/2) {
-		return "", fmt.Errorf("garbage translation: %q => %q", req.Text, out)
+		return "", translator.BadTranslationError{
+			Input:  req.Text,
+			Output: out,
+		}
 	}
 
 	out = cleanText(out2)
 
 	if IsTranslationGarbage(out) {
-		return "", fmt.Errorf("garbage translation: %q => %q", req.Text, out)
+		return "", translator.BadTranslationError{
+			Input:  req.Text,
+			Output: out,
+		}
 	}
 
 	log.WithFields(log.Fields{

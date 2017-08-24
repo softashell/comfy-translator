@@ -1,6 +1,7 @@
 package translator
 
 import (
+	"fmt"
 	"time"
 
 	"gitgud.io/softashell/comfy-translator/config"
@@ -34,4 +35,13 @@ func CheckThrottle(lastReq time.Time, delay time.Duration) {
 		log.Debugf("Throttling request for %f seconds", sleep.Seconds())
 		time.Sleep(sleep)
 	}
+}
+
+type BadTranslationError struct {
+	Input  string
+	Output string
+}
+
+func (e BadTranslationError) Error() string {
+	return fmt.Sprintf("garbage translation: %q => %q", e.Input, e.Output)
 }

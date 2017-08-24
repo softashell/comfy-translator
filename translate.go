@@ -47,7 +47,7 @@ func translate(req translator.Request) string {
 		if err != nil {
 			log.Warnf("%s: %s", source, err)
 
-			if err := c.Put(source, req.Text, out, err.Error()); err != nil {
+			if err := c.Put(source, req.Text, out, err); err != nil {
 				log.Warnf("%s: %s", source, err)
 			}
 
@@ -55,7 +55,7 @@ func translate(req translator.Request) string {
 		}
 
 		if len(out) > 0 {
-			err = c.Put(source, req.Text, out, "")
+			err = c.Put(source, req.Text, out, nil)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"err": err,
