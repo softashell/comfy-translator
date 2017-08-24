@@ -51,6 +51,8 @@ func NewCache(filePath string) (*Cache, error) {
 
 	cache.writeMetadata()
 
+	cache.cleanCacheEntries()
+
 	return cache, nil
 }
 
@@ -171,4 +173,69 @@ func getCacheExpiration(errorCode translationError) time.Duration {
 	log.Fatalf("unknow error code: %d", errorCode)
 
 	return time.Second
+}
+
+func (c *Cache) cleanCacheEntries() error {
+
+	log.Info("Cleaning up old cache entries")
+
+	buckets, err := c.getBuckets()
+	if err != nil {
+		return err
+	}
+
+	err = c.db.Update(func(tx *bolt.Tx) error {
+		for _, bucketName := range buckets {
+			b := tx.Bucket(bucketName)
+			if b == nil {
+				return nil
+			}
+
+			removed := 0
+
+			c := b.Cursor()
+			for k, v := c.First(); k != nil; k, v = c.Next() {
+				if v == nil {
+					continue
+				}
+
+				var i cacheItem
+
+				buf := bytes.NewReader(v)
+				if err := json.NewDecoder(buf).Decode(&i); err != nil {
+					log.Warnf("%v : %s", err, string(v))
+
+					if err := b.Delete(k); err != nil {
+						log.Warnf("failed to delete invalid cache entry: %v", err)
+					}
+
+					removed++
+				}
+
+				if i.ErrorCode != errorNone || i.ErrorText != "" {
+					errorTime := time.Unix(i.Timestamp, 0)
+
+					if i.ErrorCode == errorNone {
+						i.ErrorCode = errorMinor
+					}
+
+					if time.Since(errorTime) > getCacheExpiration(i.ErrorCode) {
+						if err := b.Delete(k); err != nil {
+							log.Warnf("failed to delete expired cache entry: %v", err)
+						}
+
+						removed++
+					}
+				}
+			}
+
+			if removed > 0 {
+				log.Infof("Removed %d expired or invalid cache entries from %s", removed, string(bucketName))
+			}
+		}
+
+		return nil
+	})
+
+	return err
 }
