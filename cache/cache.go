@@ -51,7 +51,7 @@ func NewCache(filePath string) (*Cache, error) {
 
 	cache.writeMetadata()
 
-	cache.cleanCacheEntries()
+	go cache.cleanCacheEntries()
 
 	return cache, nil
 }
@@ -176,7 +176,6 @@ func getCacheExpiration(errorCode translationError) time.Duration {
 }
 
 func (c *Cache) cleanCacheEntries() error {
-
 	log.Info("Cleaning up old cache entries")
 
 	buckets, err := c.getBuckets()
@@ -184,8 +183,8 @@ func (c *Cache) cleanCacheEntries() error {
 		return err
 	}
 
-	err = c.db.Update(func(tx *bolt.Tx) error {
-		for _, bucketName := range buckets {
+	for _, bucketName := range buckets {
+		err = c.db.Update(func(tx *bolt.Tx) error {
 			b := tx.Bucket(bucketName)
 			if b == nil {
 				return nil
@@ -232,10 +231,16 @@ func (c *Cache) cleanCacheEntries() error {
 			if removed > 0 {
 				log.Infof("Removed %d expired or invalid cache entries from %s", removed, string(bucketName))
 			}
+			return nil
+		})
+
+		if err != nil {
+			log.Error(err)
+			return err
 		}
+	}
 
-		return nil
-	})
+	log.Info("Cache cleanup done")
 
-	return err
+	return nil
 }
