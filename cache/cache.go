@@ -237,6 +237,10 @@ func (c *Cache) cleanCacheEntries() error {
 			return err
 		}
 
+		if len(removalList) < 1 {
+			continue
+		}
+
 		err = c.db.Update(func(tx *bolt.Tx) error {
 			b := tx.Bucket(bucketName)
 			if b == nil {
