@@ -21,6 +21,10 @@ const (
 	errorBadTranslation                         // Returned really bad translation
 )
 
+const (
+	cleanupInterval = (24 * time.Hour) * 7
+)
+
 type Cache struct {
 	db *bolt.DB
 
@@ -176,6 +180,11 @@ func getCacheExpiration(errorCode translationError) time.Duration {
 }
 
 func (c *Cache) cleanCacheEntries() error {
+	if time.Since(time.Unix(c.meta.LastCleanup, 0)) < cleanupInterval {
+		log.Info("Skipping cache cleanup")
+		return nil
+	}
+
 	log.Info("Cleaning up old cache entries")
 
 	buckets, err := c.getBuckets()
@@ -241,6 +250,12 @@ func (c *Cache) cleanCacheEntries() error {
 	}
 
 	log.Info("Cache cleanup done")
+
+	c.meta.LastCleanup = time.Now().UTC().Unix()
+
+	if err := c.writeMetadata(); err != nil {
+		log.Error(err)
+	}
 
 	return nil
 }

@@ -10,7 +10,8 @@ import (
 const metadataName = "___metadata"
 
 type cacheMetadata struct {
-	Version int
+	Version     int
+	LastCleanup int64
 }
 
 func (c *Cache) readMetadata() error {
