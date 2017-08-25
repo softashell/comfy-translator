@@ -193,13 +193,13 @@ func (c *Cache) cleanCacheEntries() error {
 	}
 
 	for _, bucketName := range buckets {
-		err = c.db.Update(func(tx *bolt.Tx) error {
+		var removalList [][]byte
+
+		err = c.db.View(func(tx *bolt.Tx) error {
 			b := tx.Bucket(bucketName)
 			if b == nil {
 				return nil
 			}
-
-			removed := 0
 
 			c := b.Cursor()
 			for k, v := c.First(); k != nil; k, v = c.Next() {
@@ -213,11 +213,7 @@ func (c *Cache) cleanCacheEntries() error {
 				if err := json.NewDecoder(buf).Decode(&i); err != nil {
 					log.Warnf("%v : %s", err, string(v))
 
-					if err := b.Delete(k); err != nil {
-						log.Warnf("failed to delete invalid cache entry: %v", err)
-					}
-
-					removed++
+					removalList = append(removalList, k)
 				}
 
 				if i.ErrorCode != errorNone || i.ErrorText != "" {
@@ -228,18 +224,39 @@ func (c *Cache) cleanCacheEntries() error {
 					}
 
 					if time.Since(errorTime) > getCacheExpiration(i.ErrorCode) {
-						if err := b.Delete(k); err != nil {
-							log.Warnf("failed to delete expired cache entry: %v", err)
-						}
-
-						removed++
+						removalList = append(removalList, k)
 					}
 				}
 			}
 
-			if removed > 0 {
-				log.Infof("Removed %d expired or invalid cache entries from %s", removed, string(bucketName))
+			return nil
+		})
+
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+
+		err = c.db.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket(bucketName)
+			if b == nil {
+				return nil
 			}
+
+			removed := 0
+
+			for _, k := range removalList {
+				if err := b.Delete(k); err != nil {
+					log.Warnf("failed to delete cache entry: %v", err)
+				}
+
+				removed++
+			}
+
+			if removed > 0 {
+				log.Infof("Removed %d out of %d expired or invalid cache entries from %s", removed, len(removalList), string(bucketName))
+			}
+
 			return nil
 		})
 
