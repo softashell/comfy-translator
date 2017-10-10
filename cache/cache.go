@@ -10,7 +10,7 @@ import (
 	"bytes"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/boltdb/bolt"
+	bolt "github.com/coreos/bbolt"
 )
 
 type translationError int

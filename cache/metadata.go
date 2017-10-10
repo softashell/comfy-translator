@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/boltdb/bolt"
+	bolt "github.com/coreos/bbolt"
 )
 
 const metadataName = "___metadata"
