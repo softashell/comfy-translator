@@ -262,7 +262,7 @@ func (c *Cache) cleanCacheEntries() error {
 			}
 
 			if removed > 0 {
-				log.Infof("Removed %d out of %d expired or invalid cache entries from %s", removed, len(removalList), string(bucketName))
+				log.Infof("Removed %d out of %d expired or invalid cache entries from %s", removed, len(removalList[string(bucketName)]), string(bucketName))
 			}
 		}
 
