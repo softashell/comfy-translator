@@ -192,16 +192,17 @@ func (c *Cache) cleanCacheEntries() error {
 		return err
 	}
 
-	for _, bucketName := range buckets {
-		var removalList [][]byte
+	removalList := make(map[string][][]byte)
 
-		err = c.db.View(func(tx *bolt.Tx) error {
+	err = c.db.View(func(tx *bolt.Tx) error {
+		for _, bucketName := range buckets {
 			b := tx.Bucket(bucketName)
 			if b == nil {
 				return nil
 			}
 
 			c := b.Cursor()
+
 			for k, v := c.First(); k != nil; k, v = c.Next() {
 				if v == nil {
 					continue
@@ -213,7 +214,7 @@ func (c *Cache) cleanCacheEntries() error {
 				if err := json.NewDecoder(buf).Decode(&i); err != nil {
 					log.Warnf("%v : %s", err, string(v))
 
-					removalList = append(removalList, k)
+					removalList[string(bucketName)] = append(removalList[string(bucketName)], k)
 				}
 
 				if i.ErrorCode != errorNone || i.ErrorText != "" {
@@ -224,24 +225,27 @@ func (c *Cache) cleanCacheEntries() error {
 					}
 
 					if time.Since(errorTime) > getCacheExpiration(i.ErrorCode) {
-						removalList = append(removalList, k)
+						removalList[string(bucketName)] = append(removalList[string(bucketName)], k)
 					}
 				}
 			}
-
-			return nil
-		})
-
-		if err != nil {
-			log.Error(err)
-			return err
 		}
 
-		if len(removalList) < 1 {
-			continue
-		}
+		return nil
+	})
 
-		err = c.db.Update(func(tx *bolt.Tx) error {
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	if len(removalList) < 1 {
+		log.Info("Nothing to remove")
+		return nil
+	}
+
+	err = c.db.Update(func(tx *bolt.Tx) error {
+		for _, bucketName := range buckets {
 			b := tx.Bucket(bucketName)
 			if b == nil {
 				return nil
@@ -249,7 +253,7 @@ func (c *Cache) cleanCacheEntries() error {
 
 			removed := 0
 
-			for _, k := range removalList {
+			for _, k := range removalList[string(bucketName)] {
 				if err := b.Delete(k); err != nil {
 					log.Warnf("failed to delete cache entry: %v", err)
 				}
@@ -260,14 +264,14 @@ func (c *Cache) cleanCacheEntries() error {
 			if removed > 0 {
 				log.Infof("Removed %d out of %d expired or invalid cache entries from %s", removed, len(removalList), string(bucketName))
 			}
-
-			return nil
-		})
-
-		if err != nil {
-			log.Error(err)
-			return err
 		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Error(err)
+		return err
 	}
 
 	log.Info("Cache cleanup done")
