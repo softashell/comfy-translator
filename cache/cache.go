@@ -103,9 +103,10 @@ func (c *Cache) Put(bucketName, text, translation string, cerr error) error {
 
 func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 	var i cacheItem
+	var err error
 	var found bool
 
-	err := c.db.View(func(tx *bolt.Tx) error {
+	err = c.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 		if b == nil {
 			log.Warnf("Bucket %q not found! (Probably nothing has been saved to it yet)", bucketName)
@@ -117,14 +118,10 @@ func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 			return nil
 		}
 
-		buf := bytes.NewReader(val)
-		if err := json.NewDecoder(buf).Decode(&i); err != nil {
-			// try to ignore decoding error and just act like we found nothing
-			log.Errorf("%v : %s", err, string(val))
-			return nil
+		i, err = decodeCacheItem(val)
+		if err == nil {
+			found = true
 		}
-
-		found = true
 
 		return nil
 	})
@@ -164,21 +161,6 @@ func (c *Cache) CreateBucket(bucketName string) error {
 	return err
 }
 
-func getCacheExpiration(errorCode translationError) time.Duration {
-	switch errorCode {
-	case errorNone:
-		return (24 * time.Hour) * 365
-	case errorMinor:
-		return time.Hour / 2
-	case errorBadTranslation:
-		return 24 * time.Hour
-	}
-
-	log.Fatalf("unknow error code: %d", errorCode)
-
-	return time.Second
-}
-
 func (c *Cache) cleanCacheEntries() error {
 	if time.Since(time.Unix(c.meta.LastCleanup, 0)) < cleanupInterval {
 		log.Info("Skipping cache cleanup")
@@ -203,29 +185,25 @@ func (c *Cache) cleanCacheEntries() error {
 
 			c := b.Cursor()
 
-			for k, v := c.First(); k != nil; k, v = c.Next() {
-				if v == nil {
+			for key, value := c.First(); key != nil; key, value = c.Next() {
+				if value == nil {
 					continue
 				}
 
-				var i cacheItem
-
-				buf := bytes.NewReader(v)
-				if err := json.NewDecoder(buf).Decode(&i); err != nil {
-					log.Warnf("%v : %s", err, string(v))
-
-					removalList[string(bucketName)] = append(removalList[string(bucketName)], k)
+				item, err := decodeCacheItem(value)
+				if err != nil {
+					removalList[string(bucketName)] = append(removalList[string(bucketName)], key)
 				}
 
-				if i.ErrorCode != errorNone || i.ErrorText != "" {
-					errorTime := time.Unix(i.Timestamp, 0)
+				if item.ErrorCode != errorNone || item.ErrorText != "" {
+					errorTime := time.Unix(item.Timestamp, 0)
 
-					if i.ErrorCode == errorNone {
-						i.ErrorCode = errorMinor
+					if item.ErrorCode == errorNone {
+						item.ErrorCode = errorMinor
 					}
 
-					if time.Since(errorTime) > getCacheExpiration(i.ErrorCode) {
-						removalList[string(bucketName)] = append(removalList[string(bucketName)], k)
+					if time.Since(errorTime) > getCacheExpiration(item.ErrorCode) {
+						removalList[string(bucketName)] = append(removalList[string(bucketName)], key)
 					}
 				}
 			}
