@@ -55,8 +55,6 @@ func NewCache(filePath string) (*Cache, error) {
 
 	cache.writeMetadata()
 
-	go cache.cleanCacheEntries()
-
 	return cache, nil
 }
 
@@ -161,7 +159,7 @@ func (c *Cache) CreateBucket(bucketName string) error {
 	return err
 }
 
-func (c *Cache) cleanCacheEntries() error {
+func (c *Cache) CleanCacheEntries() error {
 	if time.Since(time.Unix(c.meta.LastCleanup, 0)) < cleanupInterval {
 		log.Info("Skipping cache cleanup")
 		return nil
