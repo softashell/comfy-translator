@@ -22,14 +22,14 @@ func translate(req translator.Request) string {
 
 	// Checks if there are pending translation jobs for current request and wait for them to be completed
 	if ch, wait := q.Join(req); wait {
-		for out := range ch {
-			log.WithFields(log.Fields{
-				"time":   time.Since(start),
-				"source": "queue",
-			}).Infof("%q -> %q", req.Text, out)
+		out := <-ch
 
-			return out
-		}
+		log.WithFields(log.Fields{
+			"time":   time.Since(start),
+			"source": "queue",
+		}).Infof("%q -> %q", req.Text, out)
+
+		return out
 	}
 
 	for _, t := range translators {

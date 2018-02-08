@@ -62,14 +62,10 @@ func joinWait(t *testing.T, q *Queue, req translator.Request, wg *sync.WaitGroup
 		wg.Add(1)
 		defer wg.Done()
 
-		for out := range ch {
-			fmt.Println("got", out)
-			if out != expecting {
-				t.Error("Unexpected output for waiting function")
-			}
-
-			break
+		out := <-ch
+		fmt.Println("got", out)
+		if out != expecting {
+			t.Error("Unexpected output for waiting function")
 		}
-
 	}(ch)
 }
