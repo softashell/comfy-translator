@@ -27,14 +27,18 @@ func TestQueue(t *testing.T) {
 		t.Error("We shouldn't wait here")
 	}
 
+	if len(q.items) != 1 {
+		t.Error("Queue does not contain one item")
+	}
+
 	wg := sync.WaitGroup{}
 
 	joinWait(t, q, req, &wg, "test")
 	joinWait(t, q, req, &wg, "test")
 	joinWait(t, q, req, &wg, "test")
 
-	if len(q.items) != 1 {
-		t.Error("Queue does not contain one item")
+	if q.items[0].count != 3 {
+		t.Error("Does not have enough waiting jobs")
 	}
 
 	q.Push(req, "test")
