@@ -21,6 +21,7 @@ import (
 
 var (
 	c           *cache.Cache
+	q           *Queue
 	conf        *config.Config
 	translators []translator.Translator
 )
@@ -52,6 +53,8 @@ func main() {
 		log.Fatalf("Failed to initialize translation cache: %v", err)
 	}
 	defer c.Close()
+
+	q = NewQueue()
 
 	port := os.Getenv("PORT")
 	if port == "" {
