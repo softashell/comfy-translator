@@ -33,6 +33,8 @@ func NewQueue() *Queue {
 
 // Join adds a new item to queue or returns true and a channel if you need to wait
 func (q *Queue) Join(req translator.Request) (chan string, bool) {
+	q.lock.Lock()
+	defer q.lock.Unlock()
 
 	if pos, found := q.findItem(req); found {
 		var w waiterObject
@@ -56,6 +58,9 @@ func (q *Queue) Join(req translator.Request) (chan string, bool) {
 
 // Push sends output to all waiting threads and removes item from queue
 func (q *Queue) Push(req translator.Request, response string) {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
 	if pos, found := q.findItem(req); found {
 		q.items[pos].lock.Lock()
 
@@ -69,6 +74,7 @@ func (q *Queue) Push(req translator.Request, response string) {
 
 		q.removeItem(pos)
 	}
+
 }
 
 func (q *Queue) findItem(req translator.Request) (int, bool) {
@@ -81,19 +87,15 @@ func (q *Queue) findItem(req translator.Request) (int, bool) {
 }
 
 func (q *Queue) addItem(t queueObject) {
-	q.lock.Lock()
 
 	t.lock = &sync.Mutex{}
 
 	q.items = append(q.items, t)
 
-	q.lock.Unlock()
 }
 
 func (q *Queue) removeItem(i int) {
-	q.lock.Lock()
 
 	q.items = append(q.items[:i], q.items[i+1:]...)
 
-	q.lock.Unlock()
 }
