@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -26,51 +27,14 @@ func TestQueue(t *testing.T) {
 		t.Error("We shouldn't wait here")
 	}
 
-	ch, wait = q.Join(req)
-	if wait != true {
-		t.Error("We should wait here")
-	}
-	if ch == nil {
-		t.Error("Didn't return channel")
-	}
 	wg := sync.WaitGroup{}
-	go func(chan string) {
-		wg.Add(1)
-		defer wg.Done()
 
-		for out := range ch {
-			if out != "test" {
-				t.Error("Unexpected output for first waiting function")
-			}
-		}
-
-	}(ch)
-
-	ch2, wait2 := q.Join(req)
-	if wait2 != true {
-		t.Error("We should wait here")
-	}
-	if ch2 == nil {
-		t.Error("Didn't return channel")
-	}
-
-	go func(chan string) {
-		wg.Add(1)
-		defer wg.Done()
-
-		for out := range ch2 {
-			if out != "test" {
-				t.Error("Unexpected output for second waiting function")
-			}
-		}
-	}(ch2)
+	joinWait(t, q, req, &wg, "test")
+	joinWait(t, q, req, &wg, "test")
+	joinWait(t, q, req, &wg, "test")
 
 	if len(q.items) != 1 {
 		t.Error("Queue does not contain one item")
-	}
-
-	if len(q.items[0].waiters) != 2 {
-		t.Error("Does not have enough waiting jobs")
 	}
 
 	q.Push(req, "test")
@@ -80,4 +44,28 @@ func TestQueue(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func joinWait(t *testing.T, q *Queue, req translator.Request, wg *sync.WaitGroup, expecting string) {
+	ch, wait := q.Join(req)
+	if wait != true {
+		t.Error("We should wait here")
+	}
+	if ch == nil {
+		t.Error("Didn't return channel")
+	}
+	go func(chan string) {
+		wg.Add(1)
+		defer wg.Done()
+
+		for out := range ch {
+			fmt.Println("got", out)
+			if out != expecting {
+				t.Error("Unexpected output for waiting function")
+			}
+
+			break
+		}
+
+	}(ch)
 }

@@ -16,10 +16,7 @@ type queueObject struct {
 	req translator.Request
 
 	lock    *sync.Mutex
-	waiters []waiterObject
-}
-
-type waiterObject struct {
+	count   int
 	outChan chan string
 }
 
@@ -37,19 +34,18 @@ func (q *Queue) Join(req translator.Request) (chan string, bool) {
 	defer q.lock.Unlock()
 
 	if pos, found := q.findItem(req); found {
-		var w waiterObject
-
-		w.outChan = make(chan string)
-
 		q.items[pos].lock.Lock()
-		q.items[pos].waiters = append(q.items[pos].waiters, w)
+		q.items[pos].count++
 		q.items[pos].lock.Unlock()
 
-		return w.outChan, true
+		return q.items[pos].outChan, true
 	}
 
-	i := queueObject{}
-	i.req = req
+	i := queueObject{
+		req:     req,
+		outChan: make(chan string),
+		lock:    &sync.Mutex{},
+	}
 
 	q.addItem(i)
 
@@ -64,17 +60,18 @@ func (q *Queue) Push(req translator.Request, response string) {
 	if pos, found := q.findItem(req); found {
 		q.items[pos].lock.Lock()
 
-		for _, w := range q.items[pos].waiters {
-			w.outChan <- response
-
-			close(w.outChan)
+		// Sends response to all listeners
+		for i := 0; i < q.items[pos].count; i++ {
+			q.items[pos].outChan <- response
 		}
+
+		// Close unused channel
+		close(q.items[pos].outChan)
 
 		q.items[pos].lock.Unlock()
 
 		q.removeItem(pos)
 	}
-
 }
 
 func (q *Queue) findItem(req translator.Request) (int, bool) {
@@ -87,15 +84,9 @@ func (q *Queue) findItem(req translator.Request) (int, bool) {
 }
 
 func (q *Queue) addItem(t queueObject) {
-
-	t.lock = &sync.Mutex{}
-
 	q.items = append(q.items, t)
-
 }
 
 func (q *Queue) removeItem(i int) {
-
 	q.items = append(q.items[:i], q.items[i+1:]...)
-
 }
