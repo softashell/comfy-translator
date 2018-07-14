@@ -2,14 +2,10 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"sort"
-	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/urfave/negroni"
-	"gopkg.in/tylerb/graceful.v1"
 
 	"gitgud.io/softashell/comfy-translator/cache"
 	"gitgud.io/softashell/comfy-translator/config"
@@ -33,12 +29,6 @@ func main() {
 	if len(debug) > 0 {
 		log.SetLevel(log.DebugLevel)
 	}
-
-	m := http.NewServeMux()
-	m.HandleFunc("/api/translate", translateHandler)
-
-	n := negroni.New()
-	n.UseHandler(m)
 
 	var err error
 
@@ -69,10 +59,7 @@ func main() {
 		"addr": listenAddr,
 	}).Info("Ready to accept connections")
 
-	err = graceful.RunWithErr(listenAddr, 60*time.Second, n)
-	if err != nil {
-		log.Fatal(err)
-	}
+	ServeComfyRPC(listenAddr)
 }
 
 func startTranslators() {
