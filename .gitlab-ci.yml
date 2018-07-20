@@ -1,12 +1,12 @@
 image: golang:latest
 
 before_script:
-  - go-wrapper download
+  - go get -d -v
 
-#test:
-#  dependencies: []
-#  script:
-#    - go test ./...
+test:
+  dependencies: []
+  script:
+    - go test ./...
 
 build:win64:
   stage: build
