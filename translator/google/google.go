@@ -22,7 +22,7 @@ import (
 
 const (
 	userAgent    = "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"
-	defaultDelay = time.Second * 3
+	defaultDelay = time.Second * 4
 )
 
 var (
