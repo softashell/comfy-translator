@@ -12,6 +12,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/hashicorp/go-retryablehttp"
+	"github.com/pkg/errors"
 
 	"unicode"
 
@@ -20,8 +21,8 @@ import (
 )
 
 const (
-	userAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"
-	delay     = time.Second * 2
+	userAgent    = "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"
+	defaultDelay = time.Second * 3
 )
 
 var (
@@ -34,6 +35,10 @@ type Translate struct {
 	client      *retryablehttp.Client
 	lastRequest time.Time
 	mutex       *sync.Mutex
+
+	errorCount uint
+	delay      time.Duration
+	delayMutex *sync.Mutex
 }
 
 func New() *Translate {
@@ -41,12 +46,19 @@ func New() *Translate {
 
 	// Stop debug logger
 	httpClient.Logger = nil
+	httpClient.RetryMax = 1
+	httpClient.RetryWaitMin = 30 * time.Second
+	httpClient.RetryWaitMax = 2 * time.Minute
 
 	return &Translate{
 		client:      httpClient,
 		lastRequest: time.Now(),
 		mutex:       &sync.Mutex{},
 		enabled:     false,
+
+		errorCount: 0,
+		delay:      defaultDelay,
+		delayMutex: &sync.Mutex{},
 	}
 }
 
@@ -64,11 +76,41 @@ func (t *Translate) Enabled() bool {
 	return t.enabled
 }
 
+func (t *Translate) incError() {
+	t.delayMutex.Lock()
+	defer t.delayMutex.Unlock()
+
+	t.errorCount++
+
+	t.delay += defaultDelay * time.Duration(t.errorCount)
+}
+
+func (t *Translate) decError() {
+	t.delayMutex.Lock()
+	defer t.delayMutex.Unlock()
+
+	if t.errorCount < 1 {
+		return
+	}
+
+	t.errorCount++
+
+	subDelay := defaultDelay * time.Duration(t.errorCount)
+
+	if t.delay > defaultDelay {
+		if t.delay < subDelay || t.delay-subDelay < defaultDelay {
+			t.delay = defaultDelay
+		} else {
+			t.delay -= subDelay
+		}
+	}
+}
+
 func (t *Translate) Translate(req *translator.Request) (string, error) {
 	start := time.Now()
 
 	t.mutex.Lock()
-	translator.CheckThrottle(t.lastRequest, delay)
+	translator.CheckThrottle(t.lastRequest, t.delay)
 	defer t.mutex.Unlock()
 
 	var URL *url.URL
@@ -88,8 +130,7 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 
 	r, err := retryablehttp.NewRequest("GET", URL.String(), nil)
 	if err != nil {
-		log.Errorln("Failed to create request", err)
-		return "", err
+		return "", errors.Wrap(err, "Failed to create request")
 	}
 
 	r.Header.Set("User-Agent", userAgent)
@@ -98,8 +139,9 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 
 	resp, err := t.client.Do(r)
 	if err != nil {
-		log.Errorln("Failed to do request", err)
-		return "", err
+		t.incError()
+
+		return "", errors.Wrapf(err, "Failed to do request (%d errors, %s delay)", t.errorCount, t.delay)
 	}
 	defer resp.Body.Close()
 
@@ -114,9 +156,11 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 	// [[["It will be saved","助かるわい",,,3]],,"ja"]
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Error("Failed to read response body", err)
-		return "", err
+		return "", errors.Wrap(err, "Failed to read response body")
 	}
+
+	// Reduce delay between requests
+	t.decError()
 
 	allStrings := allStringRegex.FindAllStringSubmatch(string(contents), -1)
 
