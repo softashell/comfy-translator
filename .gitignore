@@ -1,2 +1,6 @@
 /comfy-translator
 /translation.db
+
+# go dep
+vendor/
+/Gopkg.lock
