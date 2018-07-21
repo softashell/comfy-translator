@@ -11,6 +11,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/hashicorp/go-retryablehttp"
 
 	"unicode"
 
@@ -20,7 +21,7 @@ import (
 
 const (
 	userAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"
-	delay     = time.Second / 2
+	delay     = time.Second * 2
 )
 
 var (
@@ -30,14 +31,19 @@ var (
 
 type Translate struct {
 	enabled     bool
-	client      *http.Client
+	client      *retryablehttp.Client
 	lastRequest time.Time
 	mutex       *sync.Mutex
 }
 
 func New() *Translate {
+	httpClient := retryablehttp.NewClient()
+
+	// Stop debug logger
+	httpClient.Logger = nil
+
 	return &Translate{
-		client:      &http.Client{Timeout: (10 * time.Second)},
+		client:      httpClient,
 		lastRequest: time.Now(),
 		mutex:       &sync.Mutex{},
 		enabled:     false,
@@ -80,7 +86,7 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 	// /translate_a/single?client=gtx&dt=t&sl=%hs&tl=%hs&ie=UTF-8&oe=UTF-8&q=%s
 	URL.RawQuery = parameters.Encode()
 
-	r, err := http.NewRequest("GET", URL.String(), nil)
+	r, err := retryablehttp.NewRequest("GET", URL.String(), nil)
 	if err != nil {
 		log.Errorln("Failed to create request", err)
 		return "", err
@@ -98,6 +104,10 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		if contents, err := ioutil.ReadAll(resp.Body); err == nil {
+			return "", fmt.Errorf("%s - %s", resp.Status, contents)
+		}
+
 		return "", fmt.Errorf("%s", resp.Status)
 	}
 
