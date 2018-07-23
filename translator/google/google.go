@@ -3,6 +3,7 @@ package google
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -22,7 +23,8 @@ import (
 
 const (
 	userAgent    = "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"
-	defaultDelay = time.Second * 4
+	defaultDelay = time.Second * 6
+	// 4 works okay for a short while, 5 works for about 30 minutes
 )
 
 var (
@@ -110,22 +112,22 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 	start := time.Now()
 
 	t.mutex.Lock()
-	translator.CheckThrottle(t.lastRequest, t.delay)
+	translator.CheckThrottle(t.lastRequest, t.delay+(time.Duration(rand.Intn(3000))*time.Millisecond))
 	defer t.mutex.Unlock()
 
 	var URL *url.URL
-	URL, err := url.Parse("https://translate.google.com/translate_a/single")
+	URL, err := url.Parse("https://translate.googleapis.com/translate_a/single")
 
 	parameters := url.Values{}
-	parameters.Add("client", "gtx")
-	parameters.Add("dt", "t")
-	parameters.Add("sl", req.From)
-	parameters.Add("tl", req.To)
-	parameters.Add("ie", "UTF-8")
-	parameters.Add("oe", "UTF-8")
-	parameters.Add("q", req.Text)
+	parameters.Add("client", "gtx") // Google translate extension
+	parameters.Add("dt", "t")       // Translate text
+	parameters.Add("hl", "en")      // Interface language
+	parameters.Add("sl", req.From)  // Source language or "auto"
+	parameters.Add("tl", req.To)    // Target language
+	parameters.Add("ie", "UTF-8")   // Input encoding
+	parameters.Add("oe", "UTF-8")   // Output encoding
+	parameters.Add("q", req.Text)   // Source text
 
-	// /translate_a/single?client=gtx&dt=t&sl=%hs&tl=%hs&ie=UTF-8&oe=UTF-8&q=%s
 	URL.RawQuery = parameters.Encode()
 
 	r, err := retryablehttp.NewRequest("GET", URL.String(), nil)
