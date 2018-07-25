@@ -28,8 +28,7 @@ const (
 )
 
 var (
-	allStringRegex = regexp.MustCompile("\"(.+?)\",\"(.+?)\",?")
-	garbageRegex   = regexp.MustCompile(`\s?_{2,3}(\s\d)?`)
+	garbageRegex = regexp.MustCompile(`\s?_{2,3}(\s\d)?`)
 )
 
 type Translate struct {
@@ -161,23 +160,22 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 		return "", errors.Wrap(err, "Failed to read response body")
 	}
 
-	// Reduce delay between requests
-	t.decError()
-
-	allStrings := allStringRegex.FindAllStringSubmatch(string(contents), -1)
-
-	if len(allStrings) < 1 {
-		return "", fmt.Errorf("Bad response %s", contents)
+	response, err := decodeResponse(string(contents))
+	if err != nil {
+		log.Error("Unknown response: %q", string(contents))
+		return "", errors.Wrap(err, "Failed to decode response json")
 	}
 
 	var out string
-	for _, v := range allStrings {
-		if len(v) < 3 {
-			continue
+	for inText, outText := range response {
+		if inText != req.Text {
+			log.Warnf("mismatched input text! %q != %q", req.Text, inText)
 		}
-
-		out += v[1]
+		out += outText
 	}
+
+	// Reduce delay between requests
+	t.decError()
 
 	// Delete garbage output which often leaves the output empty, fix your shit google tbh
 	out2 := garbageRegex.ReplaceAllString(out, "")
