@@ -11,12 +11,14 @@ import (
 
 type responseStruct [][]string
 
-func cleanJson(s string) string {
-	nullRegex := regexp.MustCompile(`(,null)+(,\d+)?`)
-	otherGarbage := regexp.MustCompile(`(?:(?:,\[null,".*])?,"[a-z]+"(?:,\[\[.*)?)(])$`)
+var (
+	nullRegex         = regexp.MustCompile(`(,null)+(,\d+)?`)
+	otherGarbageRegex = regexp.MustCompile(`(?:(?:,\[null,".*])?,"[a-z]+"(?:,\[\[.*)?)(])$`)
+)
 
+func cleanJson(s string) string {
 	s = nullRegex.ReplaceAllString(s, "")
-	s = otherGarbage.ReplaceAllString(s, "$1")
+	s = otherGarbageRegex.ReplaceAllString(s, "$1")
 
 	// Strip first and last bracket
 	if strings.HasSuffix(s, "]]]") {
