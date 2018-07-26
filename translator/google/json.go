@@ -11,6 +11,11 @@ import (
 
 type responseStruct [][]string
 
+type responsePair struct {
+	input  string
+	output string
+}
+
 var (
 	nullRegex         = regexp.MustCompile(`(,null)+(,\d+)?`)
 	otherGarbageRegex = regexp.MustCompile(`(?:(?:,\[null,".*])?,"[a-z]+"(?:,\[\[.*)?)(])$`)
@@ -43,8 +48,8 @@ func cleanResponseText(s string) string {
 	return s
 }
 
-func decodeResponse(s string) (map[string]string, error) {
-	resultMap := make(map[string]string)
+func decodeResponse(s string) ([]responsePair, error) {
+	var out []responsePair
 
 	s = cleanJson(s)
 	log.Debug(s)
@@ -63,10 +68,13 @@ func decodeResponse(s string) (map[string]string, error) {
 		translatedText := cleanResponseText(result[0])
 		inputText := cleanResponseText(result[1])
 
-		log.Debug("%q => %q\n", inputText, translatedText)
+		log.Debugf("%q => %q\n", inputText, translatedText)
 
-		resultMap[inputText] = translatedText
+		out = append(out, responsePair{
+			input:  inputText,
+			output: translatedText,
+		})
 	}
 
-	return resultMap, nil
+	return out, nil
 }

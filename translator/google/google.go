@@ -1,11 +1,6 @@
 package google
 
 import (
-	"fmt"
-	"io/ioutil"
-	"math/rand"
-	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -37,30 +32,21 @@ type Translate struct {
 	lastRequest time.Time
 	mutex       *sync.Mutex
 
-	errorCount uint
-	delay      time.Duration
-	delayMutex *sync.Mutex
+	delay time.Duration
+	batch *batchTranslator
 }
 
 func New() *Translate {
-	httpClient := retryablehttp.NewClient()
-
-	// Stop debug logger
-	httpClient.Logger = nil
-	httpClient.RetryMax = 1
-	httpClient.RetryWaitMin = 30 * time.Second
-	httpClient.RetryWaitMax = 2 * time.Minute
-
-	return &Translate{
-		client:      httpClient,
+	t := &Translate{
 		lastRequest: time.Now(),
 		mutex:       &sync.Mutex{},
 		enabled:     false,
 
-		errorCount: 0,
-		delay:      defaultDelay,
-		delayMutex: &sync.Mutex{},
+		delay: defaultDelay,
+		batch: NewBatchTranslator(2000, defaultDelay),
 	}
+
+	return t
 }
 
 func (t *Translate) Name() string {
@@ -77,105 +63,15 @@ func (t *Translate) Enabled() bool {
 	return t.enabled
 }
 
-func (t *Translate) incError() {
-	t.delayMutex.Lock()
-	defer t.delayMutex.Unlock()
-
-	t.errorCount++
-
-	t.delay += defaultDelay * time.Duration(t.errorCount)
-}
-
-func (t *Translate) decError() {
-	t.delayMutex.Lock()
-	defer t.delayMutex.Unlock()
-
-	if t.errorCount < 1 {
-		return
-	}
-
-	t.errorCount++
-
-	subDelay := defaultDelay * time.Duration(t.errorCount)
-
-	if t.delay > defaultDelay {
-		if t.delay < subDelay || t.delay-subDelay < defaultDelay {
-			t.delay = defaultDelay
-		} else {
-			t.delay -= subDelay
-		}
-	}
-}
-
 func (t *Translate) Translate(req *translator.Request) (string, error) {
 	start := time.Now()
 
-	t.mutex.Lock()
-	translator.CheckThrottle(t.lastRequest, t.delay+(time.Duration(rand.Intn(3000))*time.Millisecond))
-	defer t.mutex.Unlock()
-
-	var URL *url.URL
-	URL, err := url.Parse("https://translate.googleapis.com/translate_a/single")
-
-	parameters := url.Values{}
-	parameters.Add("client", "gtx") // Google translate extension
-	parameters.Add("dt", "t")       // Translate text
-	parameters.Add("hl", "en")      // Interface language
-	parameters.Add("sl", req.From)  // Source language or "auto"
-	parameters.Add("tl", req.To)    // Target language
-	parameters.Add("ie", "UTF-8")   // Input encoding
-	parameters.Add("oe", "UTF-8")   // Output encoding
-	parameters.Add("q", req.Text)   // Source text
-
-	URL.RawQuery = parameters.Encode()
-
-	r, err := retryablehttp.NewRequest("GET", URL.String(), nil)
-	if err != nil {
-		return "", errors.Wrap(err, "Failed to create request")
-	}
-
-	r.Header.Set("User-Agent", userAgent)
-
 	t.lastRequest = time.Now()
 
-	resp, err := t.client.Do(r)
+	out, err := t.batch.Join(req)
 	if err != nil {
-		t.incError()
-
-		return "", errors.Wrapf(err, "Failed to do request (%d errors, %s delay)", t.errorCount, t.delay)
+		return "", errors.Wrap(err, "Failed to process request")
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		if contents, err := ioutil.ReadAll(resp.Body); err == nil {
-			return "", fmt.Errorf("%s - %s", resp.Status, contents)
-		}
-
-		return "", fmt.Errorf("%s", resp.Status)
-	}
-
-	// [[["It will be saved","助かるわい",,,3]],,"ja"]
-	contents, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", errors.Wrap(err, "Failed to read response body")
-	}
-
-	response, err := decodeResponse(string(contents))
-	if err != nil {
-		log.Error("Unknown response: %q", string(contents))
-		return "", errors.Wrap(err, "Failed to decode response json")
-	}
-
-	var out string
-	for inText, outText := range response {
-		if inText != req.Text {
-			log.Warnf("mismatched input text! %q != %q", req.Text, inText)
-		}
-		out += outText
-	}
-
-	// Reduce delay between requests
-	t.decError()
 
 	// Delete garbage output which often leaves the output empty, fix your shit google tbh
 	out2 := garbageRegex.ReplaceAllString(out, "")
