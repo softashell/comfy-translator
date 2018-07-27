@@ -1,7 +1,18 @@
 image: golang:latest
 
+variables:
+  BIN_NAME: comfy-translator
+  ARTIFACTS_DIR: artifacts
+  GO_PROJECT:  gitgud.io/softashell/comfy-translator
+  OUTPUT_PATH: ${CI_PROJECT_DIR}/${ARTIFACTS_DIR}/${BIN_NAME}
+
 before_script:
-  - go get -d -v
+  - mkdir -p ${GOPATH}/src/${GO_PROJECT}
+  - mkdir -p ${CI_PROJECT_DIR}/${ARTIFACTS_DIR}
+  - cp -r ${CI_PROJECT_DIR}/* ${GOPATH}/src/${GO_PROJECT}/
+  - cd ${GOPATH}/src/${GO_PROJECT}
+  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+  - dep ensure
 
 test:
   dependencies: []
@@ -14,11 +25,11 @@ build:win64:
     GOOS: windows
     GOARCH: amd64
   script:
-    - go build -o comfy-translator.exe
+    - go build -o ${OUTPUT_PATH}.exe
   artifacts:
     name: "$CI_BUILD_NAME"
     paths:
-    - comfy-translator.exe
+      - ${ARTIFACTS_DIR}
 
 build:linux64:
   stage: build
@@ -26,11 +37,11 @@ build:linux64:
     GOOS: linux
     GOARCH: amd64
   script:
-    - go build -o comfy-translator
+    - go build -o ${OUTPUT_PATH}
   artifacts:
     name: "$CI_BUILD_NAME"
     paths:
-    - comfy-translator
+      - ${ARTIFACTS_DIR}
 
 build:osx:
   stage: build
@@ -38,8 +49,8 @@ build:osx:
     GOOS: darwin
     GOARCH: amd64
   script:
-    - go build -o comfy-translator
+    - go build -o ${OUTPUT_PATH}
   artifacts:
     name: "$CI_BUILD_NAME"
     paths:
-    - comfy-translator
+      - ${ARTIFACTS_DIR}
