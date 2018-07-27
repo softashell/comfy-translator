@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -54,7 +55,7 @@ func (q *batchTranslator) translateBatch(items []inputObject) {
 
 	//log.Debug("Items:", spew.Sdump(items))
 
-	log.Debug("processing %d items", len(items))
+	log.Infof("processing %d items", len(items))
 
 	if len(items) < 1 {
 		log.Debug("nothing to do")
@@ -118,7 +119,7 @@ func (q *batchTranslator) translateItems(items []inputObject) error {
 	}
 
 	for i, pair := range response {
-		if pair.input != items[i].req.Text {
+		if strings.TrimSpace(pair.input) != strings.TrimSpace(items[i].req.Text) {
 			items[i].outChan <- returnObject{
 				text: pair.input,
 				err:  fmt.Errorf("mismatched input text! %q != %q", items[i].req.Text, pair.input),
