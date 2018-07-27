@@ -18,8 +18,10 @@ import (
 
 const (
 	userAgent    = "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"
-	defaultDelay = time.Second * 6
+	defaultDelay = time.Second * 8
 	// 4 works okay for a short while, 5 works for about 30 minutes
+	// 6 works ok for since line requests
+	// 8 seems safe for batch requests without token (~12 lines, ~600 chars each request)
 )
 
 var (
@@ -43,7 +45,7 @@ func New() *Translate {
 		enabled:     false,
 
 		delay: defaultDelay,
-		batch: NewBatchTranslator(2000, defaultDelay*2),
+		batch: NewBatchTranslator(2000, defaultDelay),
 	}
 
 	return t

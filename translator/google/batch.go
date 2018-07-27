@@ -64,15 +64,15 @@ func (q *batchTranslator) worker() {
 		// Add some random delay to requests
 		delay := q.batchDelay + time.Duration(rand.Intn(4000))*time.Millisecond
 
-	Remaining:
-		for timePassed < delay || totalLength < q.maxLength {
+	ReadChannel:
+		for timePassed < delay && totalLength < q.maxLength {
 			timePassed = time.Since(q.lastBatch)
 			select {
 			case item := <-q.inCh:
 				items = append(items, item)
 				totalLength += len(item.req.Text)
-			default: // breaks if there's nothing in channel
-				break Remaining
+			default:
+				break ReadChannel
 			}
 		}
 
