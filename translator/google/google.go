@@ -43,7 +43,7 @@ func New() *Translate {
 		enabled:     false,
 
 		delay: defaultDelay,
-		batch: NewBatchTranslator(2000, defaultDelay),
+		batch: NewBatchTranslator(2000, defaultDelay*2),
 	}
 
 	return t
