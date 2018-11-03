@@ -56,9 +56,6 @@ func NewBatchTranslator(length int, delay time.Duration) *BatchTranslator {
 
 func (q *BatchTranslator) worker() {
 	var timePassed time.Duration
-	//var delay time.Duration
-
-	//skipDelay := false
 
 	for {
 		var items []inputObject
