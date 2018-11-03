@@ -9,7 +9,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/pkg/errors"
 )
@@ -50,7 +49,7 @@ func buildRequest(langFrom, langTo, inputText string) (*retryablehttp.Request, e
 	return r, err
 }
 
-func (q *batchTranslator) translateBatch(items []inputObject) {
+func (q *BatchTranslator) translateBatch(items []inputObject) {
 	q.lastBatch = time.Now()
 
 	//log.Debug("Items:", spew.Sdump(items))
@@ -75,13 +74,14 @@ func (q *batchTranslator) translateBatch(items []inputObject) {
 	}
 }
 
-func (q *batchTranslator) translateItems(items []inputObject) error {
+func (q *BatchTranslator) translateItems(items []inputObject) error {
 	// Join every input separated by newline
 	var reqText string
 	for _, i := range items {
 		reqText += i.req.Text + "\n"
 	}
 
+	// FIXME: Properly batch multiple languages
 	r, err := buildRequest(items[0].req.From, items[0].req.To, reqText)
 	if err != nil {
 		return err
@@ -114,8 +114,11 @@ func (q *batchTranslator) translateItems(items []inputObject) error {
 		return errors.Wrap(err, "Failed to decode response json")
 	}
 
+	/* Google sometimes splits sentences in input to multiple output objects
+	attempt to merge them back into one */
 	if len(items) != len(response) {
-		log.Fatal("Response pairs doesn't match input", spew.Sdump(response), spew.Sdump(items))
+		log.Debug("Response pair count don't match input")
+		response = mergeOutput(items, response)
 	}
 
 	for i, pair := range response {
