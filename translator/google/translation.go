@@ -110,7 +110,7 @@ func (q *batchTranslator) translateItems(items []inputObject) error {
 
 	response, err := decodeResponse(string(contents))
 	if err != nil {
-		log.Error("Unknown response: %q", string(contents))
+		log.Errorf("Unknown response: %q", string(contents))
 		return errors.Wrap(err, "Failed to decode response json")
 	}
 
