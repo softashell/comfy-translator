@@ -56,29 +56,33 @@ func NewBatchTranslator(length int, delay time.Duration) *batchTranslator {
 
 func (q *batchTranslator) worker() {
 	var timePassed time.Duration
+	//var delay time.Duration
+
+	//skipDelay := false
 
 	for {
 		var items []inputObject
 		var totalLength int
+		var totalCount int
 
-		// Add some random delay to requests
 		delay := q.batchDelay + time.Duration(rand.Intn(4000))*time.Millisecond
 
 	ReadChannel:
-		for timePassed < delay && totalLength < q.maxLength {
+		for (timePassed < delay || totalCount == 0) && totalLength < q.maxLength {
 			timePassed = time.Since(q.lastBatch)
 			select {
 			case item := <-q.inCh:
 				items = append(items, item)
 				totalLength += len(item.req.Text)
+				totalCount++
 			default:
+				if totalCount == 0 {
+					time.Sleep(time.Second)
+					continue ReadChannel
+				}
+
 				break ReadChannel
 			}
-		}
-
-		if len(items) < 1 {
-			time.Sleep(time.Second)
-			continue
 		}
 
 		if timePassed < delay {
