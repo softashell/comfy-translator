@@ -35,7 +35,7 @@ type Translate struct {
 	mutex       *sync.Mutex
 
 	delay time.Duration
-	batch *batchTranslator
+	batch *BatchTranslator
 }
 
 func New() *Translate {

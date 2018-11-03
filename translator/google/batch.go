@@ -14,7 +14,7 @@ import (
 type inputChannel chan inputObject
 type outputChannel chan returnObject
 
-type batchTranslator struct {
+type BatchTranslator struct {
 	inCh inputChannel
 
 	// Delay between requests
@@ -40,8 +40,8 @@ type returnObject struct {
 	err  error
 }
 
-func NewBatchTranslator(length int, delay time.Duration) *batchTranslator {
-	q := &batchTranslator{
+func NewBatchTranslator(length int, delay time.Duration) *BatchTranslator {
+	q := &BatchTranslator{
 		inCh:       make(inputChannel, runtime.NumCPU()),
 		maxLength:  length,
 		batchDelay: delay,
@@ -54,7 +54,7 @@ func NewBatchTranslator(length int, delay time.Duration) *batchTranslator {
 	return q
 }
 
-func (q *batchTranslator) worker() {
+func (q *BatchTranslator) worker() {
 	var timePassed time.Duration
 	//var delay time.Duration
 
@@ -95,7 +95,7 @@ func (q *batchTranslator) worker() {
 	}
 }
 
-func (q *batchTranslator) Join(req *translator.Request) (string, error) {
+func (q *BatchTranslator) Join(req *translator.Request) (string, error) {
 	outCh := make(outputChannel)
 
 	i := inputObject{
