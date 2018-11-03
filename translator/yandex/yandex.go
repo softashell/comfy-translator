@@ -73,6 +73,9 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 
 	var URL *url.URL
 	URL, err := url.Parse(apiURL)
+	if err != nil {
+		return "", err
+	}
 
 	parameters := url.Values{}
 	parameters.Add("key", t.apiKey)
