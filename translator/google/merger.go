@@ -1,6 +1,8 @@
 package google
 
 import (
+	"strings"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/davecgh/go-spew/spew"
 )
@@ -26,7 +28,7 @@ func mergeOutput(input []inputObject, output []responsePair) []responsePair {
 		}
 
 		if len(in) < len(out) {
-			log.Fatal("original text is smaller than output")
+			log.Fatalf("original text is smaller than output! %q %q", in, out)
 		}
 
 		// TODO: Loop and handle more than one item join
@@ -42,7 +44,7 @@ func mergeOutput(input []inputObject, output []responsePair) []responsePair {
 			nextIn := input[next].req.Text
 
 			if nextIn == nextOut {
-				log.Fatal("output has truncated input string")
+				log.Fatalf("output has truncated input string\n%q == %q\n%s\n%s", nextIn, nextOut, spew.Sdump(input), spew.Sdump(output))
 			}
 		}
 
