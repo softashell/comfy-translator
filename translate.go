@@ -78,6 +78,8 @@ func translate(req translator.Request) string {
 		break
 	}
 
+	out = matchWhitespace(out, req.Text)
+
 	// Notify waiting requests that we did the job
 	q.Push(req, out)
 
