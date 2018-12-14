@@ -21,7 +21,7 @@ func mergeOutput(input []inputObject, output []responsePair) []responsePair {
 		in := input[i].req.Text
 		out := output[i].input
 
-		if in == out {
+		if strings.TrimSpace(in) == strings.TrimSpace(out) {
 			continue
 		}
 
