@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -35,15 +36,9 @@ func cleanJson(s string) string {
 	return s
 }
 
-func trimSuffix(s, suffix string) string {
-	if strings.HasSuffix(s, suffix) {
-		s = s[:len(s)-len(suffix)]
-	}
-	return s
-}
-
 func cleanResponseText(s string) string {
-	s = trimSuffix(s, "\n")
+	// Remove trailing whitespace
+	s = strings.TrimRightFunc(s, unicode.IsSpace)
 
 	return s
 }

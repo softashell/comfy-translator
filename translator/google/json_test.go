@@ -97,3 +97,36 @@ func Test_cleanJson(t *testing.T) {
 		})
 	}
 }
+
+func Test_cleanResponseText(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "newline with trailing space",
+			args: args{
+				s: "ま、嬢ちゃんの身体は一つだから仕方ないな\n ",
+			},
+			want: "ま、嬢ちゃんの身体は一つだから仕方ないな",
+		},
+		{
+			name: "keep leading space",
+			args: args{
+				s: " こんなスケスケ衣装で寝るぐらいだから、 ",
+			},
+			want: " こんなスケスケ衣装で寝るぐらいだから、",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cleanResponseText(tt.args.s); got != tt.want {
+				t.Errorf("cleanResponseText() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
