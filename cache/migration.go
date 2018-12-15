@@ -1,18 +1,22 @@
 package cache
 
 import (
-	"bytes"
+	"fmt"
 	"time"
 
-	"encoding/json"
+	"go.etcd.io/bbolt"
 
 	log "github.com/Sirupsen/logrus"
-	bolt "github.com/coreos/bbolt"
-
-	"gitgud.io/softashell/comfy-translator/translator/google"
 )
 
-const latestVersion = 3
+type oldCacheItem struct {
+	Translation string           `json:"t"`
+	ErrorCode   translationError `json:"c,omitempty"`
+	ErrorText   string           `json:"e,omitempty"`
+	Timestamp   int64            `json:"u,omitempty"`
+}
+
+const latestVersion = 1
 
 func (c *Cache) migrateDatabase() error {
 	if c.meta.Version == latestVersion {
@@ -40,10 +44,6 @@ func (c *Cache) migrate(ver int) {
 	switch tgt {
 	case 1:
 		err = c.migration1()
-	case 2:
-		err = c.migration2()
-	case 3:
-		err = c.migration3()
 	}
 
 	log := log.WithFields(log.Fields{
@@ -62,130 +62,112 @@ func (c *Cache) migrate(ver int) {
 }
 
 func (c *Cache) migration1() error {
-	// Move old translations to Google bucket
+	// Move raw boltdb to storm structure
 
-	err := c.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("translations"))
-		if b == nil {
-			return nil
-		}
-
-		googleBucket, err := tx.CreateBucketIfNotExists([]byte("Google"))
-		if err != nil {
-			return err
-		}
-
-		cur := b.Cursor()
-		for k, v := cur.First(); k != nil; k, v = cur.Next() {
-			if err := googleBucket.Put(k, v); err != nil {
-				log.Error(err)
-				return err
-			}
-		}
-
-		if err := tx.DeleteBucket([]byte("translations")); err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	return err
-}
-
-func (c *Cache) migration2() error {
-	// Use json and store errors and timestamp
-
-	buckets, err := c.getBuckets()
-	if err != nil {
-		return err
+	buckets := [][]byte{
+		[]byte("Bing"),
+		[]byte("Yandex"),
+		[]byte("Google"),
 	}
 
-	timestamp := time.Now().UTC().Unix()
-	err = c.db.Update(func(tx *bolt.Tx) error {
-		for _, bucketName := range buckets {
-			b := tx.Bucket(bucketName)
+	for _, bucketName := range buckets {
+		count := 0
+
+		log.Infof("migrating %s", string(bucketName))
+
+		items := []Item{}
+
+		err := c.db.Bolt.Update(func(tx *bbolt.Tx) error {
+			b := tx.Bucket([]byte(bucketName))
 			if b == nil {
-				return nil
+				return fmt.Errorf("bucket doesn't exist: %s", string(bucketName))
 			}
 
-			c := b.Cursor()
-			for k, v := c.First(); k != nil; k, v = c.Next() {
+			cur := b.Cursor()
+			for k, v := cur.First(); k != nil; k, v = cur.Next() {
 				if v == nil {
 					continue
 				}
 
-				buf := bytes.NewBuffer(nil)
-				if err := json.NewEncoder(buf).Encode(cacheItem{
-					Translation: string(v),
-					Timestamp:   timestamp,
-				}); err != nil {
-					return err
+				oldItem, err := decodeOldCacheItem(v)
+				if err != nil {
+					log.Error(err)
 				}
 
-				if err := b.Put(k, buf.Bytes()); err != nil {
-					return err
+				if oldItem.ErrorCode == 0 && time.Since(time.Unix(oldItem.Timestamp, 0)) < getCacheExpiration(oldItem.ErrorCode) {
+					item := Item{
+						Text:        string(k),
+						Translation: oldItem.Translation,
+						ErrorCode:   oldItem.ErrorCode,
+						ErrorText:   oldItem.ErrorText,
+						Timestamp:   oldItem.Timestamp,
+					}
+
+					items = append(items, item)
+
+					count++
+
+					if count%10000 == 0 {
+						log.Info(count)
+					}
+				}
+
+				b.Delete(k)
+
+			}
+
+			log.Infof("read %d valid records", count)
+
+			return nil
+		})
+
+		if count > 0 {
+			count = 0
+
+			db := c.db.From(string(bucketName))
+			tx, err := db.Begin(true)
+			if err != nil {
+				return err
+			}
+			defer tx.Rollback()
+
+			log.Infof("writing new records")
+
+			for _, item := range items {
+
+				err = tx.Save(&item)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				count++
+
+				if count%10000 == 0 {
+					log.Info(count)
 				}
 			}
+
+			tx.Commit()
+
+			log.Infof("%d records written", count)
+		}
+
+		if err != nil {
+			log.Error("failed to migrate: ", string(bucketName))
+			continue
+		}
+
+	}
+
+	// Delete old metadata
+	err := c.db.Bolt.Update(func(tx *bbolt.Tx) error {
+		err := tx.DeleteBucket([]byte("___metadata"))
+		if err != nil {
+			log.Error(err)
 		}
 
 		return nil
 	})
 
 	return err
-}
-
-func (c *Cache) migration3() error {
-	// clean google cache
-
-	var i cacheItem
-
-	err := c.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("Google"))
-		if b == nil {
-			return nil
-		}
-
-		c := b.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			if v == nil {
-				continue
-			}
-
-			buf := bytes.NewReader(v)
-			if err := json.NewDecoder(buf).Decode(&i); err != nil {
-				log.Errorf("%v : %s", err, string(v))
-				b.Delete(k)
-				continue
-			}
-
-			if len(i.Translation) > 0 && google.IsTranslationGarbage(i.Translation) {
-				log.Debugf("Removing: %q => %q", string(k), i.Translation)
-				b.Delete(k)
-			}
-		}
-
-		return nil
-	})
-
-	return err
-}
-
-func (c *Cache) getBuckets() ([][]byte, error) {
-	var buckets [][]byte
-
-	err := c.db.View(func(tx *bolt.Tx) error {
-		if err := tx.ForEach(func(name []byte, _ *bolt.Bucket) error {
-			if string(name) != metadataName {
-				buckets = append(buckets, name)
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	return buckets, err
 }

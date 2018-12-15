@@ -1,16 +1,13 @@
 package cache
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"gitgud.io/softashell/comfy-translator/translator"
 
-	"bytes"
-
 	log "github.com/Sirupsen/logrus"
-	bolt "github.com/coreos/bbolt"
+	"github.com/asdine/storm"
 )
 
 type translationError int
@@ -26,20 +23,22 @@ const (
 )
 
 type Cache struct {
-	db *bolt.DB
+	db *storm.DB
 
-	meta cacheMetadata
+	meta Metadata
 }
 
-type cacheItem struct {
-	Translation string           `json:"t"`
-	ErrorCode   translationError `json:"c,omitempty"`
-	ErrorText   string           `json:"e,omitempty"`
-	Timestamp   int64            `json:"u,omitempty"`
+type Item struct {
+	Text        string `storm:"id"` // primary key
+	Translation string
+	ErrorCode   translationError `storm:"index"`
+	ErrorText   string
+	Timestamp   int64
 }
 
 func NewCache(filePath string) (*Cache, error) {
-	db, err := bolt.Open(filePath, 0600, nil)
+	db, err := storm.Open(filePath, storm.Batch())
+	//db, err := bolt.Open(filePath, 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
@@ -63,200 +62,66 @@ func (c *Cache) Close() error {
 }
 
 func (c *Cache) Put(bucketName, text, translation string, cerr error) error {
-	err := c.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-		if b == nil {
-			return fmt.Errorf("bucket doesn't exist??")
+	errorCode := errorNone
+	errorText := ""
+
+	if cerr != nil {
+		errorText = cerr.Error()
+
+		switch cerr.(type) {
+		case translator.BadTranslationError:
+			errorCode = errorBadTranslation
+		default:
+			errorCode = errorMinor
 		}
+	}
 
-		errorCode := errorNone
-		errorText := ""
+	item := Item{
+		Text:        text,
+		Translation: translation,
+		ErrorCode:   errorCode,
+		ErrorText:   errorText,
+		Timestamp:   time.Now().UTC().Unix(),
+	}
 
-		if cerr != nil {
-			errorText = cerr.Error()
-
-			switch cerr.(type) {
-			case translator.BadTranslationError:
-				errorCode = errorBadTranslation
-			default:
-				errorCode = errorMinor
-			}
-		}
-
-		buf := bytes.NewBuffer(nil)
-		if err := json.NewEncoder(buf).Encode(cacheItem{
-			Translation: translation,
-			ErrorCode:   errorCode,
-			ErrorText:   errorText,
-			Timestamp:   time.Now().UTC().Unix(),
-		}); err != nil {
-			return err
-		}
-
-		return b.Put([]byte(text), buf.Bytes())
-	})
+	db := c.db.From(bucketName)
+	err := db.Save(&item)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	return err
 }
 
 func (c *Cache) Get(bucketName, text string) (string, bool, error) {
-	var i cacheItem
-	var err error
+	var item Item
 	var found bool
 
-	err = c.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-		if b == nil {
-			log.Warnf("Bucket %q not found! (Probably nothing has been saved to it yet)", bucketName)
-			return nil
-		}
-
-		val := b.Get([]byte(text))
-		if val == nil {
-			return nil
-		}
-
-		i, err = decodeCacheItem(val)
-		if err == nil {
-			found = true
-		}
-
-		return nil
-	})
-
+	db := c.db.From(bucketName)
+	err := db.One("Text", text, &item)
 	if err != nil {
-		log.Fatal(err)
 		return "", false, err
 	}
 
-	if !found {
-		return "", false, nil
+	if item.Translation != "" {
+		found = true
 	}
 
-	if i.ErrorCode != errorNone {
-		errorTime := time.Unix(i.Timestamp, 0)
+	if item.ErrorCode != errorNone {
+		errorTime := time.Unix(item.Timestamp, 0)
 
-		if time.Since(errorTime) > getCacheExpiration(i.ErrorCode) {
+		if time.Since(errorTime) > getCacheExpiration(item.ErrorCode) {
+			err = db.DeleteStruct(&item)
+			if err != nil {
+				log.Warn("unable to delete item:", err)
+			}
+
+			// Act as if nothing was found
 			return "", false, nil
 		}
 
-		return "", true, fmt.Errorf("%s", i.ErrorText)
+		return "", found, fmt.Errorf("%s", item.ErrorText)
 	}
 
-	return i.Translation, found, nil
-}
-
-func (c *Cache) CreateBucket(bucketName string) error {
-	err := c.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	return err
-}
-
-func (c *Cache) CleanCacheEntries() error {
-	if time.Since(time.Unix(c.meta.LastCleanup, 0)) < cleanupInterval {
-		log.Info("Skipping cache cleanup")
-		return nil
-	}
-
-	log.Info("Cleaning up old cache entries")
-
-	buckets, err := c.getBuckets()
-	if err != nil {
-		return err
-	}
-
-	removalList := make(map[string][][]byte)
-
-	err = c.db.View(func(tx *bolt.Tx) error {
-		for _, bucketName := range buckets {
-			b := tx.Bucket(bucketName)
-			if b == nil {
-				return nil
-			}
-
-			c := b.Cursor()
-
-			for key, value := c.First(); key != nil; key, value = c.Next() {
-				if value == nil {
-					continue
-				}
-
-				item, err := decodeCacheItem(value)
-				if err != nil {
-					removalList[string(bucketName)] = append(removalList[string(bucketName)], key)
-				}
-
-				if item.ErrorCode != errorNone || item.ErrorText != "" {
-					errorTime := time.Unix(item.Timestamp, 0)
-
-					if item.ErrorCode == errorNone {
-						item.ErrorCode = errorMinor
-					}
-
-					if time.Since(errorTime) > getCacheExpiration(item.ErrorCode) {
-						removalList[string(bucketName)] = append(removalList[string(bucketName)], key)
-					}
-				}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-
-	if len(removalList) < 1 {
-		log.Info("Nothing to remove")
-		return nil
-	}
-
-	err = c.db.Update(func(tx *bolt.Tx) error {
-		for _, bucketName := range buckets {
-			b := tx.Bucket(bucketName)
-			if b == nil {
-				return nil
-			}
-
-			removed := 0
-
-			for _, k := range removalList[string(bucketName)] {
-				if err := b.Delete(k); err != nil {
-					log.Warnf("failed to delete cache entry: %v", err)
-				}
-
-				removed++
-			}
-
-			if removed > 0 {
-				log.Infof("Removed %d out of %d expired or invalid cache entries from %s", removed, len(removalList[string(bucketName)]), string(bucketName))
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-
-	log.Info("Cache cleanup done")
-
-	c.meta.LastCleanup = time.Now().UTC().Unix()
-
-	if err := c.writeMetadata(); err != nil {
-		log.Error(err)
-	}
-
-	return nil
+	return item.Translation, found, nil
 }

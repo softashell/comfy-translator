@@ -94,11 +94,6 @@ func startTranslators() {
 		} else {
 			log.Infof("%s: Disabled in config", name)
 		}
-
-		err := c.CreateBucket(name)
-		if err != nil {
-			log.Errorf("Failed to create missing bucket %q", name)
-		}
 	}
 
 	sort.Slice(t, func(i, j int) bool {

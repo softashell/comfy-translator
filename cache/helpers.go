@@ -23,8 +23,8 @@ func getCacheExpiration(errorCode translationError) time.Duration {
 	return time.Second
 }
 
-func decodeCacheItem(val []byte) (cacheItem, error) {
-	var i cacheItem
+func decodeOldCacheItem(val []byte) (oldCacheItem, error) {
+	var i oldCacheItem
 
 	buf := bytes.NewReader(val)
 	if err := json.NewDecoder(buf).Decode(&i); err != nil {
