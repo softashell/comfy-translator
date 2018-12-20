@@ -172,7 +172,7 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 		return "", fmt.Errorf("Empty response")
 	} else if len(response.Items) > 1 {
 		// Never has happened before, maybe I should panic if it does to avoid responses not handled properly
-		log.Warning("More than one item in response: %s", string(contents))
+		log.Warningf("More than one item in response: %s", string(contents))
 	}
 
 	var out string

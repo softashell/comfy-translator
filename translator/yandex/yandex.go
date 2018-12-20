@@ -120,7 +120,7 @@ func (t *Translate) Translate(req *translator.Request) (string, error) {
 	if len(response.Text) < 1 {
 		return "", fmt.Errorf("Empty response")
 	} else if len(response.Text) > 1 {
-		log.Warning("More than one item in response: %s", string(contents))
+		log.Warningf("More than one item in response: %s", string(contents))
 	}
 
 	var out string
