@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 func buildClient() *retryablehttp.Client {

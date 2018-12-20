@@ -7,7 +7,7 @@ import (
 	"net/rpc"
 
 	"gitgud.io/softashell/comfy-translator/translator"
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 type Comfy int

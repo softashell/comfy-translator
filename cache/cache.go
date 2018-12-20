@@ -6,8 +6,8 @@ import (
 
 	"gitgud.io/softashell/comfy-translator/translator"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/asdine/storm"
+	log "github.com/sirupsen/logrus"
 )
 
 type translationError int

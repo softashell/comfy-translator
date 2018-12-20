@@ -5,7 +5,7 @@ import (
 	"os"
 	"sort"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 
 	"gitgud.io/softashell/comfy-translator/cache"
 	"gitgud.io/softashell/comfy-translator/config"

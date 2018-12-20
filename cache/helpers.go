@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 func getCacheExpiration(errorCode translationError) time.Duration {

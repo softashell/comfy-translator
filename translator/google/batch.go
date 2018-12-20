@@ -8,7 +8,7 @@ import (
 	"gitgud.io/softashell/comfy-translator/translator"
 	"github.com/hashicorp/go-retryablehttp"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 type inputChannel chan inputObject

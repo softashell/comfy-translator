@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 
 	"gitgud.io/softashell/comfy-translator/translator"
 )

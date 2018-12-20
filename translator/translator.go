@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"gitgud.io/softashell/comfy-translator/config"
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 type Request struct {
