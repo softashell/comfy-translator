@@ -76,7 +76,7 @@ func (c *Cache) migration1() error {
 
 		items := []Item{}
 
-		err := c.db.Bolt.Update(func(tx *bolt.Tx) error {
+		err := c.db.Bolt.Update(func(tx *bbolt.Tx) error {
 			b := tx.Bucket([]byte(bucketName))
 			if b == nil {
 				return fmt.Errorf("bucket doesn't exist: %s", string(bucketName))
@@ -159,7 +159,7 @@ func (c *Cache) migration1() error {
 	}
 
 	// Delete old metadata
-	err := c.db.Bolt.Update(func(tx *bolt.Tx) error {
+	err := c.db.Bolt.Update(func(tx *bbolt.Tx) error {
 		err := tx.DeleteBucket([]byte("___metadata"))
 		if err != nil {
 			log.Error(err)
