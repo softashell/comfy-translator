@@ -59,17 +59,19 @@ func (q *BatchTranslator) translateBatch(items []inputObject) {
 
 	q.lastBatch = time.Now()
 
-	// TODO: Add support for different language pairs
-	err := q.translateItems(items)
-	if err != nil {
-		// Send error to all items
-		for _, i := range items {
-			i.outChan <- returnObject{
-				text: "",
-				err:  err,
+	go func() {
+		// TODO: Add support for different language pairs
+		err := q.translateItems(items)
+		if err != nil {
+			// Send error to all items
+			for _, i := range items {
+				i.outChan <- returnObject{
+					text: "",
+					err:  err,
+				}
 			}
 		}
-	}
+	}()
 }
 
 func (q *BatchTranslator) translateItems(items []inputObject) error {
