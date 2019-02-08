@@ -72,12 +72,8 @@ func (q *BatchTranslator) worker() {
 				items = append(items, item)
 				totalLength += len(item.req.Text)
 				totalCount++
-			default:
-				if totalCount == 0 {
-					time.Sleep(time.Second)
-					continue ReadChannel
-				}
-
+			case <-time.After(delay):
+				timePassed = time.Since(q.lastBatch)
 				break ReadChannel
 			}
 		}

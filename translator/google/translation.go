@@ -50,16 +50,14 @@ func buildRequest(langFrom, langTo, inputText string) (*retryablehttp.Request, e
 }
 
 func (q *BatchTranslator) translateBatch(items []inputObject) {
-	q.lastBatch = time.Now()
-
-	//log.Debug("Items:", spew.Sdump(items))
-
-	log.Infof("processing %d items", len(items))
-
 	if len(items) < 1 {
 		log.Debug("nothing to do")
 		return
 	}
+
+	log.Infof("processing %d items", len(items))
+
+	q.lastBatch = time.Now()
 
 	// TODO: Add support for different language pairs
 	err := q.translateItems(items)
