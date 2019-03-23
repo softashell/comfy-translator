@@ -36,7 +36,7 @@ func execTxAndPrint(tx *sql.Tx, stmt string) error {
 	if _, err := tx.Exec(stmt); err != nil {
 		tx.Rollback()
 
-		log.Error("Failed! %s", err)
+		log.Errorf("Failed! %s", err)
 
 		return err
 	}
