@@ -1,5 +1,7 @@
 /comfy-translator
 /translation.db
+/translation.db-shm
+/translation.db-wal
 
 # go dep
 vendor/

@@ -1,10 +1,10 @@
 package cache
 
 import (
-	"bytes"
-	"encoding/json"
+	"database/sql"
 	"time"
 
+	_ "github.com/mattn/go-sqlite3"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -23,16 +23,23 @@ func getCacheExpiration(errorCode translationError) time.Duration {
 	return time.Second
 }
 
-func decodeOldCacheItem(val []byte) (oldCacheItem, error) {
-	var i oldCacheItem
+func execAndPrint(db *sql.DB, stmt string) {
+	log.Print(stmt)
+	if _, err := db.Exec(stmt); err != nil {
+		log.Fatalf("Failed! %s", err)
+	}
+}
 
-	buf := bytes.NewReader(val)
-	if err := json.NewDecoder(buf).Decode(&i); err != nil {
-		// try to ignore decoding error and just log it
-		log.Warnf("Failed to decode bytes into cacheItem; '%s' => %v", string(val), err)
+func execTxAndPrint(tx *sql.Tx, stmt string) error {
+	log.Print(stmt)
 
-		return i, err
+	if _, err := tx.Exec(stmt); err != nil {
+		tx.Rollback()
+
+		log.Error("Failed! %s", err)
+
+		return err
 	}
 
-	return i, nil
+	return nil
 }

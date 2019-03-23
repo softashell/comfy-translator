@@ -1,37 +1,43 @@
 package cache
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/asdine/storm"
 	log "github.com/sirupsen/logrus"
-	"go.etcd.io/bbolt"
 )
-
-type oldCacheItem struct {
-	Translation string           `json:"t"`
-	ErrorCode   translationError `json:"c,omitempty"`
-	ErrorText   string           `json:"e,omitempty"`
-	Timestamp   int64            `json:"u,omitempty"`
-}
 
 const latestVersion = 1
 
 func (c *Cache) migrateDatabase() error {
-	if c.meta.Version == latestVersion {
+	latestMigration := 0
+
+	rows, err := c.db.Query("SELECT * FROM Migrations")
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			if err := rows.Scan(&latestMigration); err != nil {
+				log.Fatal(err)
+			}
+
+			log.Printf("Migration #%d already in place", latestMigration)
+		}
+	}
+
+	if latestVersion-latestMigration == 0 {
 		return nil
 	}
 
-	log.Infof("Need to run %d database migrations", latestVersion-c.meta.Version)
+	log.Infof("Need to run %d database migrations", latestVersion-latestMigration)
 
-	for c.meta.Version < latestVersion {
-		c.migrate(c.meta.Version)
+	for latestMigration < latestVersion {
+		latestMigration = c.migrate(latestMigration)
 	}
 
 	return nil
 }
 
-func (c *Cache) migrate(ver int) {
+func (c *Cache) migrate(ver int) int {
 	start := time.Now()
 
 	tgt := ver + 1
@@ -55,118 +61,105 @@ func (c *Cache) migrate(ver int) {
 		log.Fatal("Migration failed: ", err)
 	}
 
-	c.meta.Version = tgt
-
 	log.Info("Finished migration")
+
+	return tgt
 }
 
 func (c *Cache) migration1() error {
-	// Move raw boltdb to storm structure
+	log.Print("Migration #1")
 
-	buckets := [][]byte{
-		[]byte("Bing"),
-		[]byte("Yandex"),
-		[]byte("Google"),
+	tx, err := c.db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err = execTxAndPrint(tx,
+		`CREATE TABLE IF NOT EXISTS Migrations (
+		id INT PRIMARY KEY NOT NULL
+		);`); err != nil {
+		return err
+	}
+
+	if err = execTxAndPrint(tx,
+		`CREATE TABLE IF NOT EXISTS Translations (
+			id INTEGER PRIMARY KEY,
+			text TEXT NOT NULL,
+			service TEXT NOT NULL,
+			translation TEXT NOT NULL,
+			errorCode INT,
+			errorText TEXT,
+			time INT
+			);`); err != nil {
+		return err
+	}
+
+	if err = execTxAndPrint(tx,
+		`CREATE UNIQUE INDEX "translation_idx" ON "Translations" (
+			"text",
+			"service"
+			);`); err != nil {
+		return err
+	}
+
+	if err = execTxAndPrint(tx, `INSERT INTO migrations VALUES (1)`); err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+
+	c.migrateFromStorm()
+
+	return err
+}
+
+func (c *Cache) migrateFromStorm() {
+	storm, err := storm.Open("_translation.db", storm.Batch())
+	if err != nil {
+		log.Error("can't open legacy storm db (_translation.db) for import")
+		return
+	}
+
+	buckets := []string{
+		"Bing",
+		"Yandex",
+		"Google",
 	}
 
 	for _, bucketName := range buckets {
-		count := 0
+		var items []Item
 
-		log.Infof("migrating %s", string(bucketName))
-
-		items := []Item{}
-
-		err := c.db.Bolt.Update(func(tx *bbolt.Tx) error {
-			b := tx.Bucket([]byte(bucketName))
-			if b == nil {
-				return fmt.Errorf("bucket doesn't exist: %s", string(bucketName))
-			}
-
-			cur := b.Cursor()
-			for k, v := cur.First(); k != nil; k, v = cur.Next() {
-				if v == nil {
-					continue
-				}
-
-				oldItem, err := decodeOldCacheItem(v)
-				if err != nil {
-					log.Error(err)
-				}
-
-				if oldItem.ErrorCode == 0 && time.Since(time.Unix(oldItem.Timestamp, 0)) < getCacheExpiration(oldItem.ErrorCode) {
-					item := Item{
-						Text:        string(k),
-						Translation: oldItem.Translation,
-						ErrorCode:   oldItem.ErrorCode,
-						ErrorText:   oldItem.ErrorText,
-						Timestamp:   oldItem.Timestamp,
-					}
-
-					items = append(items, item)
-
-					count++
-
-					if count%10000 == 0 {
-						log.Info(count)
-					}
-				}
-
-				b.Delete(k)
-
-			}
-
-			log.Infof("read %d valid records", count)
-
-			return nil
-		})
-
-		if count > 0 {
-			count = 0
-
-			db := c.db.From(string(bucketName))
-			tx, err := db.Begin(true)
-			if err != nil {
-				return err
-			}
-			defer tx.Rollback()
-
-			log.Infof("writing new records")
-
-			for _, item := range items {
-
-				err = tx.Save(&item)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				count++
-
-				if count%10000 == 0 {
-					log.Info(count)
-				}
-			}
-
-			tx.Commit()
-
-			log.Infof("%d records written", count)
-		}
-
-		if err != nil {
-			log.Error("failed to migrate: ", string(bucketName))
-			continue
-		}
-
-	}
-
-	// Delete old metadata
-	err := c.db.Bolt.Update(func(tx *bbolt.Tx) error {
-		err := tx.DeleteBucket([]byte("___metadata"))
+		db := storm.From(bucketName)
+		err := db.All(&items)
 		if err != nil {
 			log.Error(err)
 		}
 
-		return nil
-	})
+		size := len(items)
 
-	return err
+		tx, err := c.db.Begin()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		stmt, err := tx.Prepare("INSERT INTO Translations(text, service, translation, errorCode, errorText, time) VALUES (?, ?, ?, ?, ?, ?)")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer stmt.Close()
+
+		for i, item := range items {
+			log.Printf("%s: %d / %d", bucketName, i, size)
+
+			_, err = stmt.Exec(item.Text, bucketName, item.Translation, item.ErrorCode, item.ErrorText, time.Now().UTC().Unix())
+			if err != nil {
+				log.Warnln(err)
+			}
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 }

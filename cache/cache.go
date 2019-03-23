@@ -1,12 +1,12 @@
 package cache
 
 import (
+	"database/sql"
 	"fmt"
 	"time"
 
 	"gitgud.io/softashell/comfy-translator/translator"
-
-	"github.com/asdine/storm"
+	_ "github.com/mattn/go-sqlite3" // Sql driver
 	log "github.com/sirupsen/logrus"
 )
 
@@ -23,9 +23,7 @@ const (
 )
 
 type Cache struct {
-	db *storm.DB
-
-	meta Metadata
+	db *sql.DB
 }
 
 type Item struct {
@@ -37,8 +35,7 @@ type Item struct {
 }
 
 func NewCache(filePath string) (*Cache, error) {
-	db, err := storm.Open(filePath, storm.Batch())
-	//db, err := bolt.Open(filePath, 0600, nil)
+	db, err := sql.Open("sqlite3", filePath+"?_synchronous=1&_auto_vacuum=2&_journal_mode=WAL")
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
@@ -46,13 +43,7 @@ func NewCache(filePath string) (*Cache, error) {
 
 	cache := &Cache{db: db}
 
-	cache.readMetadata()
-
-	log.Info("Cache version ", cache.meta.Version)
-
 	cache.migrateDatabase()
-
-	cache.writeMetadata()
 
 	return cache, nil
 }
@@ -76,16 +67,13 @@ func (c *Cache) Put(bucketName, text, translation string, cerr error) error {
 		}
 	}
 
-	item := Item{
-		Text:        text,
-		Translation: translation,
-		ErrorCode:   errorCode,
-		ErrorText:   errorText,
-		Timestamp:   time.Now().UTC().Unix(),
+	stmt, err := c.db.Prepare("INSERT OR REPLACE INTO Translations(text, service, translation, errorCode, errorText, time) VALUES (?, ?, ?, ?, ?, ?)")
+	if err != nil {
+		log.Fatal(err)
 	}
+	defer stmt.Close()
 
-	db := c.db.From(bucketName)
-	err := db.Save(&item)
+	_, err = stmt.Exec(text, bucketName, translation, errorCode, errorText, time.Now().UTC().Unix())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -94,24 +82,33 @@ func (c *Cache) Put(bucketName, text, translation string, cerr error) error {
 }
 
 func (c *Cache) Get(bucketName, text string) (string, bool, error) {
-	var item Item
-	var found bool
-
-	db := c.db.From(bucketName)
-	err := db.One("Text", text, &item)
+	stmt, err := c.db.Prepare("SELECT id, translation, errorCode, errorText, time FROM Translations WHERE service = ? AND text = ?")
 	if err != nil {
-		return "", false, err
+		log.Fatal(err)
+	}
+	defer stmt.Close()
+
+	var found bool
+	var id int64
+	var translation string
+	var errorCode translationError
+	var errorText string
+	var timestamp int64
+
+	err = stmt.QueryRow(bucketName, text).Scan(&id, &translation, &errorCode, &errorText, &timestamp)
+	if err != nil {
+		return translation, found, nil
 	}
 
-	if item.Translation != "" {
+	if translation != "" {
 		found = true
 	}
 
-	if item.ErrorCode != errorNone {
-		errorTime := time.Unix(item.Timestamp, 0)
+	if errorCode != errorNone {
+		errorTime := time.Unix(timestamp, 0)
 
-		if time.Since(errorTime) > getCacheExpiration(item.ErrorCode) {
-			err = db.DeleteStruct(&item)
+		if time.Since(errorTime) > getCacheExpiration(errorCode) {
+			_, err = c.db.Exec("DELETE FROM Translations WHERE id = %s", id)
 			if err != nil {
 				log.Warn("unable to delete item:", err)
 			}
@@ -120,8 +117,8 @@ func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 			return "", false, nil
 		}
 
-		return "", found, fmt.Errorf("%s", item.ErrorText)
+		return "", found, fmt.Errorf("%s", errorText)
 	}
 
-	return item.Translation, found, nil
+	return translation, found, nil
 }
