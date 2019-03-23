@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"sort"
+	"syscall"
 
 	log "github.com/sirupsen/logrus"
 
@@ -29,6 +31,17 @@ func main() {
 	if len(debug) > 0 {
 		log.SetLevel(log.DebugLevel)
 	}
+
+	sigs := make(chan os.Signal, 1)
+	done := make(chan bool, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigs
+		fmt.Println()
+		fmt.Println(sig)
+		done <- true
+	}()
 
 	var err error
 
@@ -59,7 +72,9 @@ func main() {
 		"addr": listenAddr,
 	}).Info("Ready to accept connections")
 
-	ServeComfyRPC(listenAddr)
+	go ServeComfyRPC(listenAddr)
+
+	<-done
 }
 
 func startTranslators() {

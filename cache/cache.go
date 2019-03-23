@@ -49,6 +49,9 @@ func NewCache(filePath string) (*Cache, error) {
 }
 
 func (c *Cache) Close() error {
+	log.Println("Writing checkpoint")
+	c.db.Exec("PRAGMA wal_checkpoint")
+
 	return c.db.Close()
 }
 
