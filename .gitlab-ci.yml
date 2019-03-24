@@ -5,6 +5,7 @@ variables:
   ARTIFACTS_DIR: artifacts
   GO_PROJECT:  gitgud.io/softashell/comfy-translator
   OUTPUT_PATH: ${CI_PROJECT_DIR}/${ARTIFACTS_DIR}/${BIN_NAME}
+  CGO_ENABLED: 1
 
 before_script:
   - mkdir -p ${GOPATH}/src/${GO_PROJECT}
