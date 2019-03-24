@@ -34,11 +34,17 @@ type Item struct {
 	Timestamp   int64
 }
 
-func NewCache(filePath string) (*Cache, error) {
+func NewCache(filePath string, cacheSize int) (*Cache, error) {
 	db, err := sql.Open("sqlite3", filePath+"?_synchronous=1&_auto_vacuum=2&_journal_mode=WAL")
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
+	}
+
+	if _, err := db.Exec(fmt.Sprintf("PRAGMA cache_size = -%d", cacheSize)); err != nil {
+		log.Errorf("Failed to increase page cache size! %s", err)
+	} else {
+		log.Infof("Page cache set to %d kib", cacheSize)
 	}
 
 	cache := &Cache{db: db}

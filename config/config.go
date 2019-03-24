@@ -12,7 +12,8 @@ type Config struct {
 	Host     string
 	Port     string
 	Database struct {
-		Path string
+		Path      string
+		CacheSize int
 	}
 	Translator map[string]TranslatorConfig
 }
@@ -64,6 +65,14 @@ func (c *Config) Load(configPath string) error {
 		c.Database.Path = nc.Database.Path
 	}
 
+	if len(nc.Database.Path) > 0 {
+		c.Database.CacheSize = nc.Database.CacheSize
+
+		if c.Database.CacheSize < 2000 {
+			c.Database.CacheSize = 2000
+		}
+	}
+
 	for k, v := range nc.Translator {
 		c.Translator[k] = v
 	}
@@ -89,6 +98,7 @@ func createDefaultConfig() Config {
 	c.Port = "3000"
 
 	c.Database.Path = "translation.db"
+	c.Database.CacheSize = 125000
 
 	t := make(map[string]TranslatorConfig)
 

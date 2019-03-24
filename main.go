@@ -51,7 +51,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	c, err = cache.NewCache(conf.Database.Path)
+	c, err = cache.NewCache(conf.Database.Path, conf.Database.CacheSize)
 	if err != nil {
 		log.Fatalf("Failed to initialize translation cache: %v", err)
 	}
