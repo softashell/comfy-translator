@@ -117,9 +117,9 @@ func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 		errorTime := time.Unix(timestamp, 0)
 
 		if time.Since(errorTime) > getCacheExpiration(errorCode) {
-			_, err = c.db.Exec("DELETE FROM Translations WHERE id = %s", id)
+			_, err = c.db.Exec(fmt.Sprintf("DELETE FROM Translations WHERE id = %d", id))
 			if err != nil {
-				log.Warn("unable to delete item:", err)
+				log.Warn("unable to delete item: ", err)
 			}
 
 			// Act as if nothing was found
