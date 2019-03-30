@@ -158,6 +158,8 @@ func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 				}
 			}
 
+			c.lrustore[bucketName].Remove(text)
+
 			// Act as if nothing was found
 			return "", false, nil
 		}
