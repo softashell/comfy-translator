@@ -36,7 +36,7 @@ type Item struct {
 }
 
 func NewCache(filePath string, cacheSize int, translators []string) (*Cache, error) {
-	db, err := sql.Open("sqlite3", filePath+"?cache=shared&mode=rwc&_synchronous=1&_auto_vacuum=2&_journal_mode=WAL&_busy_timeout=60000")
+	db, err := sql.Open("sqlite3", filePath+"?cache=shared&mode=rwc&_synchronous=1&_auto_vacuum=2&_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
