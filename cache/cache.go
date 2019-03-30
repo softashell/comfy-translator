@@ -43,7 +43,7 @@ func NewCache(filePath string, cacheSize int, translators []string) (*Cache, err
 	}
 
 	// Avoids database is locked errors
-	//db.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(1)
 
 	if _, err := db.Exec(fmt.Sprintf("PRAGMA cache_size = -%d", cacheSize)); err != nil {
 		log.Errorf("Failed to increase page cache size! %s", err)
