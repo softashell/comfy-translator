@@ -51,7 +51,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	c, err = cache.NewCache(conf.Database.Path, conf.Database.CacheSize)
+	var translators []string
+	for k := range conf.Translator {
+		translators = append(translators, k)
+	}
+
+	c, err = cache.NewCache(conf.Database.Path, conf.Database.CacheSize, translators)
 	if err != nil {
 		log.Fatalf("Failed to initialize translation cache: %v", err)
 	}

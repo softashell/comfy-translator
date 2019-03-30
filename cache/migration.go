@@ -7,6 +7,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type StormItem struct {
+	Text        string `storm:"id"` // primary key
+	Translation string
+	ErrorCode   translationError `storm:"index"`
+	ErrorText   string
+	Timestamp   int64
+}
+
 const latestVersion = 1
 
 func (c *Cache) migrateDatabase() error {
@@ -127,7 +135,7 @@ func (c *Cache) migrateFromStorm() {
 	}
 
 	for _, bucketName := range buckets {
-		var items []Item
+		var items []StormItem
 
 		db := storm.From(bucketName)
 		err := db.All(&items)
