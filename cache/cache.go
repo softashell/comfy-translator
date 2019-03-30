@@ -36,14 +36,14 @@ type Item struct {
 }
 
 func NewCache(filePath string, cacheSize int, translators []string) (*Cache, error) {
-	db, err := sql.Open("sqlite3", filePath+"?cache=shared&mode=rwc&_synchronous=1&_auto_vacuum=2&_journal_mode=WAL")
+	db, err := sql.Open("sqlite3", filePath+"?cache=shared&mode=rwc&_synchronous=1&_auto_vacuum=2&_journal_mode=WAL&_busy_timeout=60000")
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
 	}
 
 	// Avoids database is locked errors
-	db.SetMaxOpenConns(1)
+	//db.SetMaxOpenConns(1)
 
 	if _, err := db.Exec(fmt.Sprintf("PRAGMA cache_size = -%d", cacheSize)); err != nil {
 		log.Errorf("Failed to increase page cache size! %s", err)
