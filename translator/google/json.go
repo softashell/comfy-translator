@@ -20,11 +20,15 @@ type responsePair struct {
 var (
 	nullRegex         = regexp.MustCompile(`(,null)+(,\d+)?`)
 	otherGarbageRegex = regexp.MustCompile(`(?:(?:,\[null,".*])?,"[a-z]+"(?:,\[\[.*)?)(])$`)
+	translationSource = regexp.MustCompile(`,\[{3}"[a-z\d]+","[a-z]+_[a-z]+_\d{4}[a-z\d]+\.md"\]{3}`)
+	leftowers         = regexp.MustCompile(`,"[a-z]{2,4}"]?"?$`)
 )
 
 func cleanJson(s string) string {
 	s = nullRegex.ReplaceAllString(s, "")
+	s = translationSource.ReplaceAllString(s, "")
 	s = otherGarbageRegex.ReplaceAllString(s, "$1")
+	s = leftowers.ReplaceAllString(s, "")
 
 	// Strip first and last bracket
 	if strings.HasSuffix(s, "]]]") {
