@@ -41,6 +41,8 @@ func buildRequest(langFrom, langTo, inputText string) (*retryablehttp.Request, e
 
 	URL.RawQuery = parameters.Encode()
 
+	log.Debugf("%s", URL)
+
 	r, err := retryablehttp.NewRequest("GET", URL.String(), nil)
 	if err != nil {
 		return r, errors.Wrap(err, "Failed to create request")
