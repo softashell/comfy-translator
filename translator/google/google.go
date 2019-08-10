@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"unicode"
 
@@ -116,6 +116,9 @@ func cleanText(text string) string {
 	// Fix oddly placed '
 	text = strings.Replace(text, " ' ", "'", -1)
 	text = strings.Replace(text, " '", "'", -1)
+
+	// "ca n't" "wo n't"
+	text = strings.Replace(text, " n't", " n't", -1)
 
 	return text
 }
