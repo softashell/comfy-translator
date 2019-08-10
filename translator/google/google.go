@@ -111,6 +111,11 @@ func cleanText(text string) string {
 	text = strings.Replace(text, "\\u0026", "＆", -1)
 	text = strings.Replace(text, "\\u003c", "<", -1)
 	text = strings.Replace(text, "\\u003e", ">", -1)
+	text = strings.Replace(text, "’", "'", -1)
+
+	// Fix oddly placed '
+	text = strings.Replace(text, " ' ", "'", -1)
+	text = strings.Replace(text, " '", "'", -1)
 
 	return text
 }
