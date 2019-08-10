@@ -112,7 +112,8 @@ func (q *BatchTranslator) translateItems(items []inputObject) error {
 
 	response, err := decodeResponse(string(contents))
 	if err != nil {
-		log.Errorf("Unknown response: %q", string(contents))
+		log.Errorf("Unknown response: %s", string(contents))
+		dumpRequest(r.URL.RequestURI(), string(contents))
 		return errors.Wrap(err, "Failed to decode response json")
 	}
 
