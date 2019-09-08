@@ -1,43 +1,18 @@
 package google
 
 import (
-	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 	"unicode"
 
+	"github.com/Jeffail/gabs/v2"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
-
-type responseStruct [][]string
 
 type responsePair struct {
 	input  string
 	output string
-}
-
-var (
-	nullRegex         = regexp.MustCompile(`(,null)+(,\d+)?`)
-	otherGarbageRegex = regexp.MustCompile(`(?:(?:,\[null,".*])?,"[a-z]+"(?:,\[\[.*)?)(])$`)
-	translationSource = regexp.MustCompile(`,\[{3}"[a-z\d]+","[a-z]+_[a-z]+_\d{4}[a-z\d]+\.md"\]{3}`)
-	leftowers         = regexp.MustCompile(`,"[a-z]{2,4}"]?"?$`)
-)
-
-func cleanJson(s string) string {
-	s = nullRegex.ReplaceAllString(s, "")
-	s = translationSource.ReplaceAllString(s, "")
-	s = otherGarbageRegex.ReplaceAllString(s, "$1")
-	s = leftowers.ReplaceAllString(s, "")
-
-	// Strip first and last bracket
-	if strings.HasSuffix(s, "]]]") {
-		s = s[1 : len(s)-len("]")]
-	} else {
-		s = s[1:]
-	}
-
-	return s
 }
 
 func cleanResponseText(s string) string {
@@ -50,22 +25,23 @@ func cleanResponseText(s string) string {
 func decodeResponse(s string) ([]responsePair, error) {
 	var out []responsePair
 
-	s = cleanJson(s)
-	log.Debug(s)
-
-	var resp responseStruct
-	err := json.Unmarshal([]byte(s), &resp)
+	jsonParsed, err := gabs.ParseJSON([]byte(s))
 	if err != nil {
+		err = errors.Wrap(err, "failed to parse json")
 		return nil, err
 	}
 
-	for _, result := range resp {
-		if len(result) != 2 {
-			return nil, fmt.Errorf("returned incorrect result pair: %v", result)
+	for _, child := range jsonParsed.Index(0).Children() {
+		if len(child.Children()) < 2 {
+			return nil, fmt.Errorf("returned invalid object: %s", string(child.EncodeJSON()))
 		}
 
-		translatedText := cleanResponseText(result[0])
-		inputText := cleanResponseText(result[1])
+		if child.Index(0).Data() == nil || child.Index(0).Data() == nil {
+			continue
+		}
+
+		translatedText := cleanResponseText(child.Index(0).Data().(string))
+		inputText := cleanResponseText(child.Index(1).Data().(string))
 
 		log.Debugf("%q => %q\n", inputText, translatedText)
 
