@@ -118,7 +118,7 @@ func cleanText(text string) string {
 	text = strings.Replace(text, " '", "'", -1)
 
 	// "ca n't" "wo n't"
-	text = strings.Replace(text, " n't", " n't", -1)
+	text = strings.Replace(text, " n't", "n't", -1)
 
 	return text
 }
