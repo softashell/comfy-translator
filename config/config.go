@@ -12,8 +12,14 @@ type Config struct {
 	Host     string
 	Port     string
 	Database struct {
-		Path      string
-		CacheSize int
+		Engine string
+		Sqlite struct {
+			Path      string
+			CacheSize int
+		}
+		PostgreSQL struct {
+			URL string
+		}
 	}
 	Translator map[string]TranslatorConfig
 }
@@ -25,9 +31,7 @@ type TranslatorConfig struct {
 }
 
 func NewConfig() *Config {
-	var conf Config
-
-	conf = createDefaultConfig()
+	conf := createDefaultConfig()
 
 	return &conf
 }
@@ -61,16 +65,24 @@ func (c *Config) Load(configPath string) error {
 		c.Port = nc.Port
 	}
 
-	if len(nc.Database.Path) > 0 {
-		c.Database.Path = nc.Database.Path
+	if len(nc.Database.Engine) > 0 {
+		c.Database.Engine = nc.Database.Engine
 	}
 
-	if len(nc.Database.Path) > 0 {
-		c.Database.CacheSize = nc.Database.CacheSize
+	if len(nc.Database.Sqlite.Path) > 0 {
+		c.Database.Sqlite.Path = nc.Database.Sqlite.Path
+	}
 
-		if c.Database.CacheSize < 2000 {
-			c.Database.CacheSize = 2000
+	if len(nc.Database.Sqlite.Path) > 0 {
+		c.Database.Sqlite.CacheSize = nc.Database.Sqlite.CacheSize
+
+		if c.Database.Sqlite.CacheSize < 2000 {
+			c.Database.Sqlite.CacheSize = 2000
 		}
+	}
+
+	if len(nc.Database.PostgreSQL.URL) > 0 {
+		c.Database.PostgreSQL.URL = nc.Database.PostgreSQL.URL
 	}
 
 	for k, v := range nc.Translator {
@@ -97,8 +109,11 @@ func createDefaultConfig() Config {
 	c.Host = "127.0.0.1"
 	c.Port = "3000"
 
-	c.Database.Path = "translation.db"
-	c.Database.CacheSize = 125000
+	c.Database.Engine = "sqlite"
+
+	c.Database.Sqlite.Path = "translation.db"
+	c.Database.Sqlite.CacheSize = 125000
+	c.Database.PostgreSQL.URL = "postgres://username:password@127.0.0.1:5432/database"
 
 	t := make(map[string]TranslatorConfig)
 

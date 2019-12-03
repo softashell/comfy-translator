@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	c           *cache.Cache
+	c           cache.Cache
 	q           *Queue
 	conf        *config.Config
 	translators []translator.Translator
@@ -56,7 +56,7 @@ func main() {
 		translators = append(translators, k)
 	}
 
-	c, err = cache.NewCache(conf.Database.Path, conf.Database.CacheSize, translators)
+	c, err = cache.NewCache(conf, translators)
 	if err != nil {
 		log.Fatalf("Failed to initialize translation cache: %v", err)
 	}
