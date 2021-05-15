@@ -28,7 +28,7 @@ func mergeOutput(input []inputObject, output []responsePair) []responsePair {
 		}
 
 		if len(in) < len(out) {
-			log.Fatalf("original text is smaller than output! %q %q", in, out)
+			log.Warnf("original text is smaller than output! %q %q", in, out)
 		}
 
 		// TODO: Loop and handle more than one item join

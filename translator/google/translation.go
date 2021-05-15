@@ -117,6 +117,8 @@ func (q *BatchTranslator) translateItems(items []inputObject) error {
 		return errors.Wrap(err, "Failed to decode response json")
 	}
 
+	//originalResponse := response
+
 	/* Google sometimes splits sentences in input to multiple output objects
 	attempt to merge them back into one */
 	if len(items) != len(response) {
@@ -126,12 +128,36 @@ func (q *BatchTranslator) translateItems(items []inputObject) error {
 
 	for i, pair := range response {
 		if strings.TrimSpace(pair.input) != strings.TrimSpace(items[i].req.Text) {
-			items[i].outChan <- returnObject{
+			/*items[i].outChan <- returnObject{
 				text: pair.input,
 				err:  fmt.Errorf("mismatched input text! %q != %q", items[i].req.Text, pair.input),
-			}
+			}*/
 
-			continue
+			log.Warnf("mismatched input text! %q != %q\n", items[i].req.Text, pair.input)
+
+			/*f, err := os.OpenFile("./output.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+			if err != nil {
+				fmt.Println("===========================")
+				log.Errorln(err)
+				fmt.Printf("mismatched input text! %q != %q\n", items[i].req.Text, pair.input)
+				fmt.Println("ORIGINAL =>")
+				spew.Dump(originalResponse[i-1:i+1])
+				fmt.Println("MERGED =>")
+				spew.Dump(response[i-1:i+1])
+
+			} else {
+				fmt.Fprintln(f, "===========================")
+				fmt.Fprintf(f, "mismatched input text! %q != %q\n", items[i].req.Text, pair.input)
+				fmt.Fprintln(f,"ORIGINAL =>")
+				spew.Fdump(f,originalResponse[i-1:i+1])
+				fmt.Fprintln(f,"MERGED =>")
+				spew.Fdump(f,response[i-1:i+1])
+
+				f.Sync();
+				f.Close();
+			}*/
+
+			//continue
 		}
 
 		items[i].outChan <- returnObject{

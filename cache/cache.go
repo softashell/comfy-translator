@@ -1,10 +1,11 @@
 package cache
 
 import (
-	"errors"
+	"fmt"
 	"strings"
 	"time"
 
+	"gitgud.io/softashell/comfy-translator/cache/postgres"
 	"gitgud.io/softashell/comfy-translator/cache/sqlite"
 	"gitgud.io/softashell/comfy-translator/config"
 )
@@ -31,18 +32,19 @@ type Item struct {
 type Cache interface {
 	Put(bucketName, text, translation string, cerr error) error
 	Get(bucketName, text string) (string, bool, error)
-
 	Close() error
 }
 
 func NewCache(conf *config.Config, translators []string) (Cache, error) {
-	switch strings.ToLower(conf.Database.Engine) {
+
+	engineName := strings.ToLower(conf.Database.Engine)
+
+	switch engineName {
 	case "sqlite":
 		return sqlite.NewCache(conf.Database.Sqlite.Path, conf.Database.Sqlite.CacheSize, translators)
-		break
 	case "postgresql":
-		break
+		return postgres.NewCache(conf.Database.PostgreSQL.URL, conf.Database.Sqlite.CacheSize, translators)
 	}
 
-	return nil, errors.New("Not implemented")
+	return nil, fmt.Errorf("unknown database engine %s", engineName)
 }
