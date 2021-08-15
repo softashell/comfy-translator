@@ -8,6 +8,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -98,7 +99,7 @@ func (c *Cache) Put(bucketName, text, translation string, cerr error) error {
 		Timestamp:   	time.Now().UTC(),
 	}
 
-	result := c.db.Create(&pgItem)
+	result := c.db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&pgItem)
 	if result.Error != nil {
 		log.Fatal(errors.Wrap(result.Error, "failed to execute insert"))
 	}
