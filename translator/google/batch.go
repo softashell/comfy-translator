@@ -62,7 +62,7 @@ func (q *BatchTranslator) worker() {
 		var totalLength int
 		var totalCount int
 
-		delay := q.batchDelay + time.Duration(rand.Intn(4000))*time.Millisecond
+		delay := q.batchDelay + time.Duration(rand.Intn(3000))*time.Millisecond
 
 	ReadChannel:
 		for (timePassed < delay || totalCount == 0) && totalLength < q.maxLength {
@@ -70,7 +70,7 @@ func (q *BatchTranslator) worker() {
 			select {
 			case item := <-q.inCh:
 				items = append(items, item)
-				totalLength += len(item.req.Text)
+				totalLength += len([]rune(item.req.Text))
 				totalCount++
 			case <-time.After(delay):
 				timePassed = time.Since(q.lastBatch)
