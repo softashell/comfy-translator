@@ -1,13 +1,15 @@
-package sqlite
+package postgres
 
 import (
-	"database/sql"
 	"fmt"
 	"time"
 
 	"gitgud.io/softashell/comfy-translator/translator"
 	lru "github.com/hashicorp/golang-lru"
-	_ "github.com/mattn/go-sqlite3" // Sql driver
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -19,12 +21,8 @@ const (
 	errorBadTranslation                         // Returned really bad translation
 )
 
-const (
-	cleanupInterval = (24 * time.Hour) * 7
-)
-
 type Cache struct {
-	db       *sql.DB
+	db       *gorm.DB
 	lrustore map[string]*lru.TwoQueueCache
 }
 
@@ -35,20 +33,26 @@ type Item struct {
 	Timestamp   int64
 }
 
-func NewCache(filePath string, cacheSize int, translators []string) (*Cache, error) {
-	db, err := sql.Open("sqlite3", filePath+"?cache=shared&mode=rwc&_synchronous=1&_auto_vacuum=2&_journal_mode=WAL&_busy_timeout=5000")
+type PgItem struct {
+	Text string `gorm:"primarykey"`
+	Bucket string `gorm:"primaryKey"`
+	Translation string
+	ErrorCode   translationError
+	ErrorText   string
+	Timestamp   time.Time
+}
+
+func NewCache(connStr string, cacheSize int, translators []string) (*Cache, error) {
+	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{})
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
 	}
 
-	// Avoids database is locked errors
-	db.SetMaxOpenConns(1)
-
-	if _, err := db.Exec(fmt.Sprintf("PRAGMA cache_size = -%d", cacheSize)); err != nil {
-		log.Errorf("Failed to increase page cache size! %s", err)
-	} else {
-		log.Infof("Page cache set to %d kib", cacheSize)
+	err = db.AutoMigrate(&PgItem{})
+	if err != nil {
+		log.Fatal(err)
+		return nil, err
 	}
 
 	store := make(map[string]*lru.TwoQueueCache)
@@ -63,19 +67,11 @@ func NewCache(filePath string, cacheSize int, translators []string) (*Cache, err
 
 	cache := &Cache{db: db, lrustore: store}
 
-	cache.migrateDatabase()
-
 	return cache, nil
 }
 
 func (c *Cache) Close() error {
-	log.Println("VACUUM")
-	c.db.Exec("VACUUM")
-
-	log.Println("Writing checkpoint")
-	c.db.Exec("PRAGMA wal_checkpoint")
-
-	return c.db.Close()
+	return nil
 }
 
 func (c *Cache) Put(bucketName, text, translation string, cerr error) error {
@@ -93,15 +89,18 @@ func (c *Cache) Put(bucketName, text, translation string, cerr error) error {
 		}
 	}
 
-	stmt, err := c.db.Prepare("INSERT OR REPLACE INTO Translations(text, service, translation, errorCode, errorText, time) VALUES (?, ?, ?, ?, ?, ?)")
-	if err != nil {
-		log.Fatal(err)
+	pgItem := PgItem{
+		Text: 			text,	
+		Bucket: 		bucketName,
+		Translation: 	translation,
+		ErrorCode:   	errorCode,
+		ErrorText:   	errorText,
+		Timestamp:   	time.Now().UTC(),
 	}
-	defer stmt.Close()
 
-	_, err = stmt.Exec(text, bucketName, translation, errorCode, errorText, time.Now().UTC().Unix())
-	if err != nil {
-		log.Fatal(err)
+	result := c.db.Create(&pgItem)
+	if result.Error != nil {
+		log.Fatal(errors.Wrap(result.Error, "failed to execute insert"))
 	}
 
 	// Add to memory cache
@@ -114,17 +113,15 @@ func (c *Cache) Put(bucketName, text, translation string, cerr error) error {
 
 	c.lrustore[bucketName].Add(text, i)
 
-	return err
+	return result.Error
 }
 
 func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 	var found bool
-	var id int64
 	var translation string
 	var errorCode translationError
 	var errorText string
 	var timestamp int64
-	var err error
 
 	item, ok := c.lrustore[bucketName].Get(text)
 	if ok {
@@ -134,16 +131,15 @@ func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 		errorCode = i.ErrorCode
 		errorText = i.ErrorText
 	} else {
-		stmt, err := c.db.Prepare("SELECT id, translation, errorCode, errorText, time FROM Translations WHERE service = ? AND text = ?")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer stmt.Close()
-
-		err = stmt.QueryRow(bucketName, text).Scan(&id, &translation, &errorCode, &errorText, &timestamp)
-		if err != nil {
+		i := PgItem{}
+		result := c.db.Limit(1).Find(&i, PgItem{Text: text,	Bucket: bucketName})
+		if result.Error != nil {
 			return translation, found, nil
 		}
+
+		translation = i.Translation
+		errorCode = i.ErrorCode
+		errorText = i.ErrorText
 	}
 
 	if translation != "" {
@@ -154,11 +150,10 @@ func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 		errorTime := time.Unix(timestamp, 0)
 
 		if time.Since(errorTime) > getCacheExpiration(errorCode) {
-			if id != 0 {
-				_, err = c.db.Exec(fmt.Sprintf("DELETE FROM Translations WHERE id = %d", id))
-				if err != nil {
-					log.Warn("unable to delete item: ", err)
-				}
+			i := PgItem{}
+			result := c.db.Delete(&i, PgItem{Text: text,	Bucket: bucketName})
+			if result.Error != nil {
+				log.Warn("unable to delete item: ", result.Error)
 			}
 
 			c.lrustore[bucketName].Remove(text)

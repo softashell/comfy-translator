@@ -42,7 +42,7 @@ func NewCache(conf *config.Config, translators []string) (Cache, error) {
 	switch engineName {
 	case "sqlite":
 		return sqlite.NewCache(conf.Database.Sqlite.Path, conf.Database.Sqlite.CacheSize, translators)
-	case "postgresql":
+	case "postgresql","postgres":
 		return postgres.NewCache(conf.Database.PostgreSQL.URL, conf.Database.Sqlite.CacheSize, translators)
 	}
 
