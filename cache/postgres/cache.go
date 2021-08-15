@@ -33,7 +33,7 @@ type Item struct {
 	Timestamp   int64
 }
 
-type PgItem struct {
+type Translation struct {
 	Text string `gorm:"primarykey"`
 	Bucket string `gorm:"primaryKey"`
 	Translation string
@@ -49,7 +49,7 @@ func NewCache(connStr string, cacheSize int, translators []string) (*Cache, erro
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&PgItem{})
+	err = db.AutoMigrate(&Translation{})
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
@@ -89,7 +89,7 @@ func (c *Cache) Put(bucketName, text, translation string, cerr error) error {
 		}
 	}
 
-	pgItem := PgItem{
+	pgItem := Translation{
 		Text: 			text,	
 		Bucket: 		bucketName,
 		Translation: 	translation,
@@ -131,8 +131,8 @@ func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 		errorCode = i.ErrorCode
 		errorText = i.ErrorText
 	} else {
-		i := PgItem{}
-		result := c.db.Limit(1).Find(&i, PgItem{Text: text,	Bucket: bucketName})
+		i := Translation{}
+		result := c.db.Limit(1).Find(&i, Translation{Text: text,	Bucket: bucketName})
 		if result.Error != nil {
 			return translation, found, nil
 		}
@@ -150,8 +150,8 @@ func (c *Cache) Get(bucketName, text string) (string, bool, error) {
 		errorTime := time.Unix(timestamp, 0)
 
 		if time.Since(errorTime) > getCacheExpiration(errorCode) {
-			i := PgItem{}
-			result := c.db.Delete(&i, PgItem{Text: text,	Bucket: bucketName})
+			i := Translation{}
+			result := c.db.Delete(&i, Translation{Text: text,	Bucket: bucketName})
 			if result.Error != nil {
 				log.Warn("unable to delete item: ", result.Error)
 			}
