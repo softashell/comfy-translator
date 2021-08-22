@@ -9,6 +9,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/logger"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -44,11 +45,31 @@ type Translation struct {
 }
 
 func NewCache(connStr string, cacheSize int, translators []string) (*Cache, error) {
-	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{})
+	newLogger := logger.New(log.StandardLogger(),
+	logger.Config{
+		SlowThreshold:              time.Second/2,   // Slow SQL threshold
+		LogLevel:                   logger.Warn, 	 // Log level
+		IgnoreRecordNotFoundError: 	true,            // Ignore ErrRecordNotFound error for logger
+		Colorful:                  	true,            // Disable color
+	})
+
+	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{
+		Logger: newLogger,
+	})
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
 	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal(err)
+		return nil, err
+	}
+
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	err = db.AutoMigrate(&Translation{})
 	if err != nil {
