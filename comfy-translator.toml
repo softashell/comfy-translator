@@ -1,0 +1,25 @@
+Host = "127.0.0.1"
+Port = "3000"
+
+[Database]
+  Engine = "sqlite"
+  [Database.Sqlite]
+    Path = "translation.db"
+    CacheSize = 250000
+  [Database.PostgreSQL]
+    URL = "postgres://postgres:postgres@127.0.0.1:5432/translator?sslmode=disable"
+
+[Translator]
+  [Translator.Bing]
+    Enabled = false
+    Priority = 3
+    Key = ""
+  [Translator.Google]
+    Enabled = true
+    Priority = 1
+    Key = ""
+  [Translator.Yandex]
+    Enabled = false
+    Priority = 2
+    #Get your key at https://translate.yandex.com/developers/keys
+    Key = ""
