@@ -19,8 +19,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
-	golang.org/x/net v0.0.0-20220722155237-a158d28d115b
-	golang.org/x/text v0.3.8 // indirect
+	golang.org/x/net v0.7.0
 	google.golang.org/appengine v1.6.7 // indirect
 	gorm.io/driver/postgres v1.1.0
 	gorm.io/gorm v1.21.13
